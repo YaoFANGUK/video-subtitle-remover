@@ -1,0 +1,5 @@
+# @package _group_
+data_root_dir: /home/user/lama/celeba-hq-dataset/
+out_root_dir: /home/user/lama/experiments/
+tb_dir: /home/user/lama/tb_logs/
+pretrained_models: /home/user/lama/

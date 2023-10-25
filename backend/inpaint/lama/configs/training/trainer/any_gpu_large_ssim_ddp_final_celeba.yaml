@@ -1,0 +1,22 @@
+# @package _group_
+kwargs:
+  gpus: -1
+  accelerator: ddp
+  max_epochs: 40
+  gradient_clip_val: 1
+  log_gpu_memory: None
+  limit_train_batches: 25000
+  val_check_interval: 2600
+  log_every_n_steps: 250
+  precision: 32
+  terminate_on_nan: False
+  check_val_every_n_epoch: 1
+  num_sanity_val_steps: 8
+  replace_sampler_ddp: False
+checkpoint_kwargs:
+  verbose: True
+  save_top_k: 5
+  save_last: True
+  period: 1
+  monitor: val_ssim_fid100_f1_total_mean
+  mode: max

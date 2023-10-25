@@ -1,0 +1,11 @@
+evaluator_kwargs:
+  batch_size: 1
+
+dataset_kwargs:
+  img_suffix: _input.png
+  inpainted_suffix: .png
+  pad_out_to_modulo: 8
+
+segmentation:
+  enable: True
+  weights_path: ${TORCH_HOME}

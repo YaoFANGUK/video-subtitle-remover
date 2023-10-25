@@ -1,0 +1,7 @@
+# @package _group_
+generator:
+  kind: adam
+  lr: 0.001
+discriminator:
+  kind: adam
+  lr: 0.0001

@@ -1,0 +1,115 @@
+# @package _group_
+
+# try to resemble mask generation of DeepFill v2
+# official tf version: https://github.com/JiahuiYu/generative_inpainting/blob/master/inpaint_ops.py#L168
+# pytorch version: https://github.com/zhaoyuzhi/deepfillv2/blob/62dad2c601400e14d79f4d1e090c2effcb9bf3eb/deepfillv2/dataset.py#L40
+# another unofficial pytorch version: https://github.com/avalonstrel/GatedConvolution/blob/master/config/inpaint.yml
+# they are a bit different, official version has slightly larger masks
+
+batch_size: 10
+val_batch_size: 2
+num_workers: 3
+
+train:
+  indir: ${location.data_root_dir}/train
+  out_size: 256
+
+  mask_gen_kwargs:  # probabilities do not need to sum to 1, they are re-normalized in mask generator
+    irregular_proba: 1
+    irregular_kwargs:
+      max_angle: 4
+      max_len: 80  # math.sqrt(H*H+W*W) / 8 + math.sqrt(H*H+W*W) / 16 https://github.com/JiahuiYu/generative_inpainting/blob/master/inpaint_ops.py#L189
+      max_width: 40
+      max_times: 12
+      min_times: 4
+
+    box_proba: 1
+    box_kwargs:
+      margin: 0
+      bbox_min_size: 30
+      bbox_max_size: 128
+      max_times: 1
+      min_times: 1
+
+    segm_proba: 0  # not working yet due to RuntimeError: Cannot re-initialize CUDA in forked subprocess. To use CUDA with multiprocessing, you must use the 'spawn' start method
+
+  transform_variant: default
+  dataloader_kwargs:
+    batch_size: ${data.batch_size}
+    shuffle: True
+    num_workers: ${data.num_workers}
+
+val:
+  indir: ${location.data_root_dir}/val
+  img_suffix: .png
+  dataloader_kwargs:
+    batch_size: ${data.val_batch_size}
+    shuffle: False
+    num_workers: ${data.num_workers}
+
+#extra_val:
+#  random_thin_256:
+#    indir: ${location.data_root_dir}/extra_val/random_thin_256
+#    img_suffix: .png
+#    dataloader_kwargs:
+#      batch_size: ${data.val_batch_size}
+#      shuffle: False
+#      num_workers: ${data.num_workers}
+#  random_medium_256:
+#    indir: ${location.data_root_dir}/extra_val/random_medium_256
+#    img_suffix: .png
+#    dataloader_kwargs:
+#      batch_size: ${data.val_batch_size}
+#      shuffle: False
+#      num_workers: ${data.num_workers}
+#  random_thick_256:
+#    indir: ${location.data_root_dir}/extra_val/random_thick_256
+#    img_suffix: .png
+#    dataloader_kwargs:
+#      batch_size: ${data.val_batch_size}
+#      shuffle: False
+#      num_workers: ${data.num_workers}
+#  random_thin_512:
+#    indir: ${location.data_root_dir}/extra_val/random_thin_512
+#    img_suffix: .png
+#    dataloader_kwargs:
+#      batch_size: ${data.val_batch_size}
+#      shuffle: False
+#      num_workers: ${data.num_workers}
+#  random_medium_512:
+#    indir: ${location.data_root_dir}/extra_val/random_medium_512
+#    img_suffix: .png
+#    dataloader_kwargs:
+#      batch_size: ${data.val_batch_size}
+#      shuffle: False
+#      num_workers: ${data.num_workers}
+#  random_thick_512:
+#    indir: ${location.data_root_dir}/extra_val/random_thick_512
+#    img_suffix: .png
+#    dataloader_kwargs:
+#      batch_size: ${data.val_batch_size}
+#      shuffle: False
+#      num_workers: ${data.num_workers}
+#  segm_256:
+#    indir: ${location.data_root_dir}/extra_val/segm_256
+#    img_suffix: .png
+#    dataloader_kwargs:
+#      batch_size: ${data.val_batch_size}
+#      shuffle: False
+#      num_workers: ${data.num_workers}
+#  segm_512:
+#    indir: ${location.data_root_dir}/extra_val/segm_512
+#    img_suffix: .png
+#    dataloader_kwargs:
+#      batch_size: ${data.val_batch_size}
+#      shuffle: False
+#      num_workers: ${data.num_workers}
+
+visual_test:
+  indir: ${location.data_root_dir}/visual_test
+  img_suffix: _input.png
+  pad_out_to_modulo: 32
+  dataloader_kwargs:
+    batch_size: 1
+    shuffle: False
+    num_workers: ${data.num_workers}

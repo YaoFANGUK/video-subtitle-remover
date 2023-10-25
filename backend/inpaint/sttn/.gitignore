@@ -1,0 +1,12 @@
+*/__pycache__/
+release_model
+*.log
+debug.py
+*.avi
+.ipynb_checkpoints
+*.DS_Store
+checkpoints
+examples/*_result.mp4
+*.jpg
+*.png
+*.zip

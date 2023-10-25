@@ -1,0 +1,4 @@
+# @package _group_
+kind: default
+inpainted_key: inpainted  # if you want to evaluate before blending with original image by mask, set predicted_image
+integral_kind: ssim_fid100_f1

@@ -1,0 +1,33 @@
+generator_kind: random
+
+mask_generator_kwargs:
+  irregular_proba: 1
+  irregular_kwargs:
+    min_times: 4
+    max_times: 5
+    max_width: 50
+    max_angle: 4
+    max_len: 100
+
+  box_proba: 0.3
+  box_kwargs:
+    margin: 0
+    bbox_min_size: 10
+    bbox_max_size: 50
+    max_times: 5
+    min_times: 1
+
+  segm_proba: 0
+  squares_proba: 0
+
+  variants_n: 5
+
+max_masks_per_image: 1
+
+cropping:
+  out_min_size: 256
+  handle_small_mode: upscale
+  out_square_crop: True
+  crop_min_overlap: 1
+
+max_tamper_area: 0.5

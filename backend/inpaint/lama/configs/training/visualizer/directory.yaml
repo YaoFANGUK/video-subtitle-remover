@@ -1,0 +1,12 @@
+# @package _group_
+kind: directory
+outdir: samples
+key_order:
+  - image
+  - predicted_image
+  - discr_output_fake
+  - discr_output_real
+  - inpainted
+rescale_keys:
+  - discr_output_fake
+  - discr_output_real

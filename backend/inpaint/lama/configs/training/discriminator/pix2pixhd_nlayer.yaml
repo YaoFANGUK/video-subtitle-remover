@@ -1,0 +1,5 @@
+# @package _group_
+kind: pix2pixhd_nlayer
+input_nc: 3
+ndf: 64
+n_layers: 4

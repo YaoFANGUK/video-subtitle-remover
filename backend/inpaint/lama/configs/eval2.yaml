@@ -1,0 +1,7 @@
+evaluator_kwargs:
+  batch_size: 8
+  device: cuda
+
+dataset_kwargs:
+  img_suffix: .png
+  inpainted_suffix: .png
