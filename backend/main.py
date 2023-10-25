@@ -55,6 +55,7 @@ class SubtitleDetect:
 
     def find_subtitle_frame_no(self):
         video_cap = cv2.VideoCapture(self.video_path)
+        frame_count = video_cap.get(cv2.CAP_PROP_FRAME_COUNT)
         current_frame_no = 0
         subtitle_frame_no_list = {}
 
@@ -80,6 +81,7 @@ class SubtitleDetect:
                     else:
                         temp_list.append((xmin, xmax, ymin, ymax))
                 subtitle_frame_no_list[current_frame_no] = temp_list
+            print(f'[字幕查找]{current_frame_no}/{int(frame_count)}')
         return subtitle_frame_no_list
 
 
@@ -144,7 +146,7 @@ class SubtitleRemover:
                 masks = self.create_mask(frame, sub_list[index])
                 frame = self.inpaint_frame(frame, masks)
             self.video_writer.write(frame)
-            print(f'{index}/{int(self.frame_count)}')
+            print(f'[字幕去除]{index}/{int(self.frame_count)}')
         self.video_cap.release()
         self.video_writer.release()
 
