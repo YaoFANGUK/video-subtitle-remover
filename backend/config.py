@@ -1,7 +1,8 @@
+import warnings
+warnings.filterwarnings("ignore")
 import os
 import torch
 import logging
-
 from fsplit.filesplit import Filesplit
 
 logging.disable(logging.DEBUG)  # 关闭DEBUG日志的打印

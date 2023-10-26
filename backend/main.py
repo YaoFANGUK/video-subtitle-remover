@@ -1,12 +1,13 @@
+import config
 import os
 from pathlib import Path
 import threading
 import cv2
 import sys
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import importlib
-import config
 import numpy as np
+from tqdm import tqdm
 from tools.infer import utility
 from tools.infer.predict_det import TextDetector
 from inpaint.lama_inpaint import inpaint_img_with_lama
@@ -56,6 +57,7 @@ class SubtitleDetect:
     def find_subtitle_frame_no(self):
         video_cap = cv2.VideoCapture(self.video_path)
         frame_count = video_cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        tbar = tqdm(total=int(frame_count), unit='f', position=0, file=sys.__stdout__, desc='字幕查找')
         current_frame_no = 0
         subtitle_frame_no_list = {}
 
@@ -81,7 +83,7 @@ class SubtitleDetect:
                     else:
                         temp_list.append((xmin, xmax, ymin, ymax))
                 subtitle_frame_no_list[current_frame_no] = temp_list
-            print(f'[字幕查找]{current_frame_no}/{int(frame_count)}')
+            tbar.update(1)
         return subtitle_frame_no_list
 
 
@@ -137,6 +139,7 @@ class SubtitleRemover:
         # 寻找字幕帧
         sub_list = self.sub_detector.find_subtitle_frame_no()
         index = 0
+        tbar = tqdm(total=int(self.frame_count), unit='f', position=0, file=sys.__stdout__, desc='字幕去除')
         while True:
             ret, frame = self.video_cap.read()
             if not ret:
@@ -146,7 +149,7 @@ class SubtitleRemover:
                 masks = self.create_mask(frame, sub_list[index])
                 frame = self.inpaint_frame(frame, masks)
             self.video_writer.write(frame)
-            print(f'[字幕去除]{index}/{int(self.frame_count)}')
+            tbar.update(1)
         self.video_cap.release()
         self.video_writer.release()
 
@@ -175,11 +178,10 @@ class SubtitleRemover:
 
 
 if __name__ == '__main__':
-    # 开始提取字幕
-    v_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'test', 'test_en.mp4')
-    print(v_path)
+    # 提示用户输入视频路径
+    video_path = input(f"请输入视频文件路径: ").strip()
     # 新建字幕提取对象
-    sd = SubtitleRemover(v_path)
+    sd = SubtitleRemover(video_path)
     sd.run()
 
 
