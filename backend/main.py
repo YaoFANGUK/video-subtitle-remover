@@ -1,3 +1,6 @@
+import shutil
+import subprocess
+import random
 import config
 import os
 from pathlib import Path
@@ -8,6 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import importlib
 import numpy as np
+import tempfile
 from tqdm import tqdm
 from tools.infer import utility
 from tools.infer.predict_det import TextDetector
@@ -93,6 +97,7 @@ class SubtitleRemover:
         importlib.reload(config)
         # 线程锁
         self.lock = threading.RLock()
+        uln = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
         # 用户指定的字幕区域位置
         self.sub_area = sub_area
         # 视频路径
@@ -111,8 +116,10 @@ class SubtitleRemover:
         # 创建字幕检测对象
         self.sub_detector = SubtitleDetect(self.video_path, self.sub_area)
         # 创建视频写对象
+        self.video_temp_out_name = os.path.join(os.path.dirname(self.video_path), f'{self.vd_name}_{"".join(random.sample(uln, 8))}.mp4')
+        self.video_writer = cv2.VideoWriter(self.video_temp_out_name, cv2.VideoWriter_fourcc(*'mp4v'), self.fps, self.size)
         self.video_out_name = os.path.join(os.path.dirname(self.video_path), f'{self.vd_name}_no_sub.mp4')
-        self.video_writer = cv2.VideoWriter(self.video_out_name, cv2.VideoWriter_fourcc(*'mp4v'), self.fps, self.size)
+
 
     @staticmethod
     def get_coordinates(dt_box):
@@ -153,8 +160,12 @@ class SubtitleRemover:
             tbar.update(1)
         self.video_cap.release()
         self.video_writer.release()
+        # 将原音频合并到新生成的视频文件中
+        self.merge_audio_to_video()
+        print(f"视频生字幕去除成功，文件路径：{self.video_out_name}")
 
-    def inpaint(self, img, mask):
+    @staticmethod
+    def inpaint( img, mask):
         img_inpainted = inpaint_img_with_lama(img, mask, config.LAMA_CONFIG, config.LAMA_MODEL_PATH, device=config.device)
         return img_inpainted
 
@@ -177,6 +188,26 @@ class SubtitleRemover:
                 masks.append(mask)
         return masks
 
+    def merge_audio_to_video(self):
+        temp = tempfile.NamedTemporaryFile(suffix='.aac', delete=False)
+        audio_extract_command = [config.FFMPEG_PATH,
+                                 "-y", "-i", self.video_path,
+                                 "-acodec", "copy",
+                                 "-vn", "-loglevel", "error", temp.name]
+        use_shell = True if os.name == "nt" else False
+        subprocess.check_output(audio_extract_command, stdin=open(os.devnull), shell=use_shell)
+        if os.path.exists(self.video_temp_out_name):
+            audio_merge_command = [config.FFMPEG_PATH,
+                                   "-y", "-i", self.video_temp_out_name,
+                                   "-i", temp.name,
+                                   "-vcodec", "copy",
+                                   "-acodec", "copy",
+                                   "-loglevel", "error", self.video_out_name]
+            subprocess.check_output(audio_merge_command, stdin=open(os.devnull), shell=use_shell)
+        if os.path.exists(self.video_temp_out_name):
+            os.remove(self.video_temp_out_name)
+        temp.close()
+
 
 if __name__ == '__main__':
     # 提示用户输入视频路径
@@ -184,5 +215,3 @@ if __name__ == '__main__':
     # 新建字幕提取对象
     sd = SubtitleRemover(video_path)
     sd.run()
-
-

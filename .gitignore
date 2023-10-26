@@ -361,3 +361,4 @@ $RECYCLE.BIN/
 /test2.py
 /subtitle.ini
 *_no_sub.mp4
+/backend/ffmpeg/win_x64/ffmpeg.exe
