@@ -188,7 +188,7 @@ class SubtitleRemoverGUI:
                 ret, frame = self.video_cap.read()
                 if ret:
                     for video in self.video_paths:
-                        print(f"Open Video Success'：{video}")
+                        print(f"Open Video Success：{video}")
                     # 获取视频的帧数
                     self.frame_count = self.video_cap.get(cv2.CAP_PROP_FRAME_COUNT)
                     # 获取视频的高度
