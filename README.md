@@ -142,6 +142,6 @@ python ./backend/main.py
 ## 常见问题
 1. CondaHTTPError
 
-将项目中的.condarc放在用户目录下(C:\Users\<你的用户名>)，如果用户目录已经存在该文件则覆盖
+将项目中的.condarc放在用户目录下(C:/Users/<你的用户名>)，如果用户目录已经存在该文件则覆盖
 
 解决方案：https://zhuanlan.zhihu.com/p/260034241
