@@ -12,6 +12,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import importlib
 import numpy as np
 import tempfile
+import torch
+from paddle import fluid
 from tqdm import tqdm
 from tools.infer import utility
 from tools.infer.predict_det import TextDetector
@@ -119,7 +121,9 @@ class SubtitleRemover:
         self.video_temp_out_name = os.path.join(os.path.dirname(self.video_path), f'{self.vd_name}_{"".join(random.sample(uln, 8))}.mp4')
         self.video_writer = cv2.VideoWriter(self.video_temp_out_name, cv2.VideoWriter_fourcc(*'mp4v'), self.fps, self.size)
         self.video_out_name = os.path.join(os.path.dirname(self.video_path), f'{self.vd_name}_no_sub.mp4')
-
+        fluid.install_check.run_check()
+        if torch.cuda.is_available():
+            print('使用GPU进行加速')
 
     @staticmethod
     def get_coordinates(dt_box):

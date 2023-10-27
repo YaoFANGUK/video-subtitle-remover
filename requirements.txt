@@ -1,8 +1,6 @@
 albumentations==0.5.2
 filesplit==3.0.2
 opencv-python==4.8.1.78
-torch==2.0.1
-torchvision==0.15.2
 scikit-image==0.17.2
 imgaug==0.4.0
 kornia==0.5.0
@@ -17,4 +15,4 @@ pandas==2.0.3
 webdataset==0.2.57
 pytorch-lightning==1.2.9
 numpy==1.23.1
-
+protobuf==3.20.0

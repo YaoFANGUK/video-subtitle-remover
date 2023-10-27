@@ -22,13 +22,15 @@ Video-subtitle-remover (vsr) 是一款基于AI技术，将视频中的硬字幕�
 
 ## 源码使用说明
 
+> **无Nvidia显卡请勿使用本项目**，最低配置：
+>
+> **GPU**：GTX 1060或以上显卡
+> 
+> CPU: 支持AVX指令集
+
 #### 1. 下载安装Miniconda 
 
 - Windows: <a href="https://repo.anaconda.com/miniconda/Miniconda3-py38_4.11.0-Windows-x86_64.exe">Miniconda3-py38_4.11.0-Windows-x86_64.exe</a>
-
-
-- MacOS：<a href="https://repo.anaconda.com/miniconda/Miniconda3-py38_4.11.0-MacOSX-x86_64.pkg">Miniconda3-py38_4.11.0-MacOSX-x86_64.pkg</a>
-
 
 - Linux: <a href="https://repo.anaconda.com/miniconda/Miniconda3-py38_4.11.0-Linux-x86_64.sh">Miniconda3-py38_4.11.0-Linux-x86_64.sh</a>
 
@@ -118,6 +120,15 @@ conda activate videoEnv
  
         > 如果安装cuda 11.2，请对应安装8.1.1的cuDNN，并使用对应cuda版本的paddlepaddle，**30系列以上的显卡驱动可能不支持 cuda 11.2及以下版本的安装**  
 
+  - 安装GPU版本Pytorch:
+        
+    ```shell 
+    conda install pytorch==2.0.1 torchvision==0.15.2 pytorch-cuda=11.7 -c pytorch -c nvidia
+    ```
+    或者使用
+    ```shell 
+    pip install torch==2.0.1 torchvision==0.15.2 --index-url https://download.pytorch.org/whl/cu117
+    ```
 
   - 安装其他依赖:
 
