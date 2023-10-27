@@ -44,3 +44,5 @@ if 'ffmpeg.exe' not in os.listdir(os.path.join(BASE_DIR, '', 'ffmpeg', 'win_x64'
     fs.merge(input_dir=os.path.join(BASE_DIR, '', 'ffmpeg', 'win_x64'))
 # 将ffmpeg添加可执行权限
 os.chmod(FFMPEG_PATH, stat.S_IRWXU+stat.S_IRWXG+stat.S_IRWXO)
+
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
