@@ -1,7 +1,5 @@
-import shutil
 import subprocess
 import random
-import config
 import os
 from pathlib import Path
 import threading
@@ -9,6 +7,7 @@ import cv2
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import config
 import importlib
 import numpy as np
 import tempfile
@@ -124,6 +123,11 @@ class SubtitleRemover:
         fluid.install_check.run_check()
         if torch.cuda.is_available():
             print('使用GPU进行加速')
+        # 总处理进度
+        self.progress_total = 0
+        self.isFinished = False
+        # 预览帧
+        self.preview_frame = None
 
     @staticmethod
     def get_coordinates(dt_box):
@@ -156,17 +160,21 @@ class SubtitleRemover:
             ret, frame = self.video_cap.read()
             if not ret:
                 break
+            original_frame = frame
             index += 1
             if index in sub_list:
                 masks = self.create_mask(frame, sub_list[index])
                 frame = self.inpaint_frame(frame, masks)
+            self.preview_frame = cv2.hconcat([original_frame, frame])
             self.video_writer.write(frame)
             tbar.update(1)
+            self.progress_total = 100 * float(index)/float(self.frame_count)
         self.video_cap.release()
         self.video_writer.release()
         # 将原音频合并到新生成的视频文件中
         self.merge_audio_to_video()
         print(f"视频生字幕去除成功，文件路径：{self.video_out_name}")
+        self.isFinished = True
 
     @staticmethod
     def inpaint( img, mask):

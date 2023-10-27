@@ -9,6 +9,7 @@ lmdb==1.4.1
 PyYAML==6.0.1
 omegaconf==2.1.2
 tqdm==4.66.1
+PySimpleGUI==4.55.1
 easydict==1.9
 scikit-learn==0.24.2
 pandas==2.0.3
