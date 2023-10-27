@@ -63,7 +63,7 @@ class SubtitleDetect:
     def find_subtitle_frame_no(self):
         video_cap = cv2.VideoCapture(self.video_path)
         frame_count = video_cap.get(cv2.CAP_PROP_FRAME_COUNT)
-        tbar = tqdm(total=int(frame_count), unit='f', position=0, file=sys.__stdout__, desc='字幕查找')
+        tbar = tqdm(total=int(frame_count), unit='f', position=0, file=sys.__stdout__, desc='Subtitle Finding')
         current_frame_no = 0
         subtitle_frame_no_list = {}
 
@@ -122,7 +122,7 @@ class SubtitleRemover:
         self.video_out_name = os.path.join(os.path.dirname(self.video_path), f'{self.vd_name}_no_sub.mp4')
         fluid.install_check.run_check()
         if torch.cuda.is_available():
-            print('使用GPU进行加速')
+            print('use GPU for acceleration')
         # 总处理进度
         self.progress_total = 0
         self.isFinished = False
@@ -155,7 +155,7 @@ class SubtitleRemover:
         # 寻找字幕帧
         sub_list = self.sub_detector.find_subtitle_frame_no()
         index = 0
-        tbar = tqdm(total=int(self.frame_count), unit='f', position=0, file=sys.__stdout__, desc='字幕去除')
+        tbar = tqdm(total=int(self.frame_count), unit='f', position=0, file=sys.__stdout__, desc='Subtitle Removing')
         while True:
             ret, frame = self.video_cap.read()
             if not ret:
@@ -173,7 +173,7 @@ class SubtitleRemover:
         self.video_writer.release()
         # 将原音频合并到新生成的视频文件中
         self.merge_audio_to_video()
-        print(f"视频生字幕去除成功，文件路径：{self.video_out_name}")
+        print(f"Subtitle successfully removed, video generated at：{self.video_out_name}")
         self.isFinished = True
 
     @staticmethod
@@ -223,7 +223,7 @@ class SubtitleRemover:
 
 if __name__ == '__main__':
     # 提示用户输入视频路径
-    video_path = input(f"请输入视频文件路径: ").strip()
+    video_path = input(f"Please input video file path: ").strip()
     # 新建字幕提取对象
     sd = SubtitleRemover(video_path)
     sd.run()
