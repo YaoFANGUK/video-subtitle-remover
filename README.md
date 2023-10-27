@@ -11,13 +11,17 @@ Video-subtitle-remover (vsr) 是一款基于AI技术，将视频中的硬字幕�
 - 支持自定义字幕位置，仅去除定义位置中的字幕（传入位置）
 - 支持全视频自动去除所有文本（不传入位置）
 
+**程序界面：**
+
 <img src="https://github.com/YaoFANGUK/video-subtitle-remover/raw/main/design/demo.png" alt="demo.png" width="650"/>
 
-## 演示
-
-<a href="https://b23.tv/guEbl9C">点击查看演示视频👇</a>
+**效果演示：**
 
 <a href="https://b23.tv/guEbl9C"><img src="https://github.com/YaoFANGUK/video-subtitle-remover/raw/main/design/demo.jpg" alt="demo.jpg" width="650"/></a>
+
+## 视频演示
+
+<a href="https://b23.tv/guEbl9C">点击查看演示视频👇</a>
 
 <p style="text-align:center;"><a href="https://b23.tv/guEbl9C"><img src="https://github.com/YaoFANGUK/video-subtitle-remover/raw/main/design/demo.gif" alt="demo.gif"/></a></p>
 
