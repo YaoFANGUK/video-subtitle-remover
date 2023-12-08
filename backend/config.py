@@ -35,7 +35,7 @@ MAX_PROCESS_NUM = 70
 # 【根据自己内存大小设置，应该大于等于MAX_PROCESS_NUM】
 MAX_LOAD_NUM = 70
 # 是否开启精细模式，开启精细模式将消耗大量GPU显存，如果您的显卡显存较少，建议设置为False
-ACCURATE_MODE = True
+ACCURATE_MODE = False
 # 是否开启快速模型，不保证inpaint效果
 FAST_MODE = False
 # ×××××××××××××××××××× [可以改] start ××××××××××××××××××××
