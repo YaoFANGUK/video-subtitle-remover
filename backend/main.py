@@ -5,6 +5,10 @@ from pathlib import Path
 import threading
 import cv2
 import sys
+
+from backend.scenedetect import scene_detect
+from backend.scenedetect.detectors import ContentDetector
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.inpaint.lama_inpaint import LamaInpaint
@@ -115,6 +119,21 @@ class SubtitleDetect:
             if len(subtitle_frame_no_box_dict[key]) > 0:
                 new_subtitle_frame_no_box_dict[key] = subtitle_frame_no_box_dict[key]
         return new_subtitle_frame_no_box_dict
+
+    @staticmethod
+    def get_scene_div_frame_no(v_path):
+        """
+        获取发生场景切换的帧号
+        """
+        scene_div_frame_no_list = []
+        scene_list = scene_detect(v_path, ContentDetector())
+        for scene in scene_list:
+            start, end = scene
+            if start.frame_num == 0:
+                pass
+            else:
+                scene_div_frame_no_list.append(start.frame_num + 1)
+        return scene_div_frame_no_list
 
     @staticmethod
     def are_similar(region1, region2):
