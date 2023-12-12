@@ -121,6 +121,29 @@ class SubtitleDetect:
         return new_subtitle_frame_no_box_dict
 
     @staticmethod
+    def split_range_by_scene(intervals, points):
+        # 确保离散值列表是有序的
+        points.sort()
+        # 用于存储结果区间的列表
+        result_intervals = []
+        # 遍历区间
+        for start, end in intervals:
+            # 在当前区间内的点
+            current_points = [p for p in points if start <= p <= end]
+
+            # 遍历当前区间内的离散点
+            for p in current_points:
+                # 如果当前离散点不是区间的起始点，添加从区间开始到离散点前一个数字的区间
+                if start < p:
+                    result_intervals.append((start, p - 1))
+                # 更新区间开始为当前离散点
+                start = p
+            # 添加从最后一个离散点或区间开始到区间结束的区间
+            result_intervals.append((start, end))
+        # 输出结果
+        return result_intervals
+
+    @staticmethod
     def get_scene_div_frame_no(v_path):
         """
         获取发生场景切换的帧号
@@ -512,6 +535,9 @@ class SubtitleRemover:
         # from test1_dict_raw import test1_raw
         # sub_list = self.sub_detector.unify_regions(test1_raw)
         continuous_frame_no_list = self.sub_detector.find_continuous_ranges_with_same_mask(sub_list)
+        # 获取场景分割的帧号
+        scene_div_points = self.sub_detector.get_scene_div_frame_no(self.video_path)
+        continuous_frame_no_list = self.sub_detector.split_range_by_scene(continuous_frame_no_list, scene_div_points)
         tbar = tqdm(total=int(self.frame_count), unit='frame', position=0, file=sys.__stdout__,
                     desc='Subtitle Removing')
         print('[Processing] start removing subtitles...')
