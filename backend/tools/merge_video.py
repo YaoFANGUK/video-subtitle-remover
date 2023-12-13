@@ -31,3 +31,5 @@ if __name__ == '__main__':
     merge_video(v0_path, v1_path, v2_path, video_out_path)
     # ffmpeg 命令 mp4转gif
     # ffmpeg -i demo3.mp4 -vf "scale=w=720:h=-1,fps=15,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" -loop 0 -r 15 -f gif output.gif
+    # 宽度固定400，高度成比例：
+    # ffmpeg - i input.avi -vf scale=400:-2

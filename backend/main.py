@@ -525,15 +525,12 @@ class SubtitleRemover:
         self.progress_total = 50 + self.progress_remover
 
     def run(self):
-
         # 记录开始时间
         start_time = time.time()
-        # 寻找字幕帧
+        # 重置进度条
         self.progress_total = 0
+        # 寻找字幕帧
         sub_list = self.sub_detector.find_subtitle_frame_no(sub_remover=self)
-        # 测试代码
-        # from test1_dict_raw import test1_raw
-        # sub_list = self.sub_detector.unify_regions(test1_raw)
         continuous_frame_no_list = self.sub_detector.find_continuous_ranges_with_same_mask(sub_list)
         # 获取场景分割的帧号
         scene_div_points = self.sub_detector.get_scene_div_frame_no(self.video_path)
@@ -546,9 +543,11 @@ class SubtitleRemover:
             self.lama_inpaint = LamaInpaint()
             original_frame = cv2.imread(self.video_path)
             mask = create_mask(original_frame.shape[0:2], sub_list[1])
-            frame = self.lama_inpaint(original_frame, mask)
-            cv2.imencode(self.ext, frame)[1].tofile(self.video_out_name)
-            self.preview_frame = cv2.hconcat([original_frame, frame])
+            inpainted_frame = self.lama_inpaint(original_frame, mask)
+            print(original_frame.shape)
+            print(inpainted_frame.shape)
+            self.preview_frame = cv2.hconcat([original_frame, inpainted_frame])
+            cv2.imencode(self.ext, inpainted_frame)[1].tofile(self.video_out_name)
             tbar.update(1)
             self.progress_total = 100
         else:
