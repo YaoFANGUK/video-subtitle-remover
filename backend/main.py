@@ -5,16 +5,15 @@ from pathlib import Path
 import threading
 import cv2
 import sys
-
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import config
 from backend.scenedetect import scene_detect
 from backend.scenedetect.detectors import ContentDetector
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.inpaint.lama_inpaint import LamaInpaint
 from backend.inpaint.video_inpaint import VideoInpaint
 from backend.tools.inpaint_tools import create_mask, batch_generator
-import config
 import importlib
 import platform
 import tempfile
