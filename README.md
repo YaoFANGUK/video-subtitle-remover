@@ -176,6 +176,10 @@ python ./backend/main.py
 
 解决方案：升级7-zip解压程序到最新版本
 
+3. 4090使用cuda 11.7跑不起来
+
+解决方案：改用cuda 11.8
+
 ## 赞助
 <img src="https://i.imgur.com/THE81jM.jpg" width="300">
 
