@@ -10,9 +10,10 @@ import paddle
 paddle.disable_signal_handler()
 logging.disable(logging.DEBUG)  # 关闭DEBUG日志的打印
 logging.disable(logging.WARNING)  # 关闭WARNING日志的打印
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LAMA_MODEL_PATH = os.path.join(BASE_DIR, 'models', 'big-lama')
+STTN_MODEL_PATH = os.path.join(BASE_DIR, 'models', 'sttn', 'infer_model.pth')
 VIDEO_INPAINT_MODEL_PATH = os.path.join(BASE_DIR, 'models', 'video')
 MODEL_VERSION = 'V4'
 DET_MODEL_BASE = os.path.join(BASE_DIR, 'models')
