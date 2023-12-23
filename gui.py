@@ -5,14 +5,15 @@
 @FileName: gui.py
 @desc: 字幕提取器图形化界面
 """
-import backend.main
 import os
 import configparser
 import PySimpleGUI as sg
 import cv2
 from threading import Thread
 import multiprocessing
-
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import backend.main
 
 class SubtitleRemoverGUI:
 
