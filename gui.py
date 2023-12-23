@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 """
 @Author  : Fang Yao
-@Time    : 2021/4/1 6:07 下午
+@Time    : 2023/4/1 6:07 下午
 @FileName: gui.py
-@desc: 字幕提取器图形化界面
+@desc: 字幕去除器图形化界面
 """
 import os
 import configparser
 import PySimpleGUI as sg
 import cv2
+import sys
 from threading import Thread
 import multiprocessing
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
