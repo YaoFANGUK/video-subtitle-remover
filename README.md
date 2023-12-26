@@ -24,9 +24,9 @@ Video-subtitle-remover (VSR) 是一款基于AI技术，将视频中的硬字幕�
 
 Windows GPU版本v1.0.0（GPU）：
 
-- 百度网盘:  <a href="https://pan.baidu.com/s/1t0djUPjQ96X8U9HisyoiYA?pwd=vsr1">vsr_windows_gpu_v1.0.0.7z</a> 提取码：**vsr1**
+- 百度网盘:  <a href="https://pan.baidu.com/s/1UX3f1lXx-yXiiOS4FSqONQ?pwd=vsr1">vsr_windows_gpu_v1.1.0.zip</a> 提取码：**vsr1**
 
-- Google Drive:  <a href="https://drive.google.com/drive/folders/1NRgLNoHHOmdO4GxLhkPbHsYfMOB_3Elr?usp=sharing">vsr_windows_gpu_v1.0.0.7z</a> 
+- Google Drive:  <a href="https://drive.google.com/drive/folders/1NRgLNoHHOmdO4GxLhkPbHsYfMOB_3Elr?usp=sharing">vsr_windows_gpu_v1.1.0.zip</a> 
 
 > 仅供具有Nvidia显卡的用户使用(AMD的显卡不行)
 
@@ -181,11 +181,12 @@ python ./backend/main.py
 解决方案：改用cuda 11.8
 
 ## 赞助
-<img src="https://i.imgur.com/THE81jM.jpg" width="300">
+<img src="https://i.imgur.com/EMCP5Lv.jpeg" width="600">
 
 | 捐赠者 | 累计捐赠金额 | 赞助席位 |
 | --- | --- | --- |
-| 陈凯 | 50.00 RMB | 金牌赞助席位 |
+| 坤V | 400.00 RMB | 金牌赞助席位 |
+| 陈凯 | 50.00 RMB | 银牌赞助席位 |
 | Tshuang | 20.00 RMB | 银牌赞助席位 |
 | 很奇异| 15.00 RMB | 银牌赞助席位 |
 | 何斐| 10.00 RMB | 银牌赞助席位 |
