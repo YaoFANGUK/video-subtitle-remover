@@ -33,8 +33,8 @@ THRESHOLD_HEIGHT_DIFFERENCE = 20
 # 1280x720p视频设置80需要25G显存，设置50需要19G显存
 # 720x480p视频设置80需要8G显存，设置50需要7G显存
 MAX_PROCESS_NUM = 70
-# 【根据自己内存大小设置，应该大于等于MAX_PROCESS_NUM】
-MAX_LOAD_NUM = 200
+# 【根据自己内存大小设置】设置的越大效果越好，但是时间越长
+MAX_LOAD_NUM = 20
 # 模式列表，请根据自己需求选择inpiant模式
 # ACCURATE模式将消耗大量GPU显存，如果您的显卡显存较少，建议设置为NORMAL
 MODE_LIST = ['FAST', 'NORMAL', 'ACCURATE']

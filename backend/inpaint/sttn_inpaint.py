@@ -87,6 +87,7 @@ class STTNInpaint:
                     frame[inpaint_area[k][0]:inpaint_area[k][1], :, :] = mask_area * comp + (1 - mask_area) * frame[inpaint_area[k][0]:inpaint_area[k][1], :, :]
                 # 将最终帧添加到列表
                 inpainted_frames.append(frame)
+                print(f'processing frame, {len(frames_hr) - j} left')
         return inpainted_frames
 
     @staticmethod
