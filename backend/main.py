@@ -671,6 +671,7 @@ class SubtitleRemover:
             if current_frame_index not in start_end_map.keys():
                 self.video_writer.write(frame)
                 print(f'write frame: {current_frame_index}')
+                self.update_progress(tbar, increment=1)
                 if self.gui_mode:
                     self.preview_frame = cv2.hconcat([frame, frame])
             # 如果是区间开始，则找到尾巴
@@ -709,7 +710,6 @@ class SubtitleRemover:
                             if self.gui_mode:
                                 self.preview_frame = cv2.hconcat([batch[i], inpainted_frame])
                     self.update_progress(tbar, increment=len(batch))
-        self.update_progress(tbar, increment=len(batch))
 
     def lama_mode(self, sub_list, tbar):
         print('use lama mode')
