@@ -35,10 +35,12 @@ THRESHOLD_HEIGHT_DIFFERENCE = 20
 MAX_PROCESS_NUM = 70
 # 【根据自己内存大小设置，应该大于等于MAX_PROCESS_NUM】
 MAX_LOAD_NUM = 200
-# 是否开启精细模式，开启精细模式将消耗大量GPU显存，如果您的显卡显存较少，建议设置为False
-ACCURATE_MODE = True
-# 是否开启快速模型，不保证inpaint效果
-FAST_MODE = False
+# 模式列表，请根据自己需求选择inpiant模式
+# ACCURATE模式将消耗大量GPU显存，如果您的显卡显存较少，建议设置为NORMAL
+MODE_LIST = ['FAST', 'NORMAL', 'ACCURATE']
+MODE = 'NORMAL'
+# 如果仅需要去除文字区域，则使用FAST
+SUPER_FAST = False
 # ×××××××××××××××××××× [可以改] start ××××××××××××××××××××
 
 
@@ -73,8 +75,6 @@ if 'ffmpeg.exe' not in os.listdir(os.path.join(BASE_DIR, '', 'ffmpeg', 'win_x64'
 os.chmod(FFMPEG_PATH, stat.S_IRWXU+stat.S_IRWXG+stat.S_IRWXO)
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-
-# 如果开启了快速模式，则强制关闭ACCURATE_MODE
-if FAST_MODE:
-    ACCURATE_MODE = False
+if SUPER_FAST:
+    MODE = 'FAST'
 # ×××××××××××××××××××× [不要改] end ××××××××××××××××××××

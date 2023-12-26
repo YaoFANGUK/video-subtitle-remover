@@ -667,9 +667,7 @@ class SubtitleRemover:
                                 self.update_progress(tbar, increment=len(batch))
         # *********************** 批推理方案 end ***********************
 
-
     def lama_mode(self, sub_list, tbar):
-        # *********************** 单线程方案 start ***********************
         print('use lama mode')
         if self.lama_inpaint is None:
             self.lama_inpaint = LamaInpaint()
@@ -682,7 +680,7 @@ class SubtitleRemover:
             index += 1
             if index in sub_list.keys():
                 mask = create_mask(self.mask_size, sub_list[index])
-                if config.FAST_MODE:
+                if config.SUPER_FAST:
                     frame = cv2.inpaint(frame, mask, 3, cv2.INPAINT_TELEA)
                 else:
                     frame = self.lama_inpaint(frame, mask)
@@ -694,7 +692,6 @@ class SubtitleRemover:
             tbar.update(1)
             self.progress_remover = 100 * float(index) / float(self.frame_count) // 2
             self.progress_total = 50 + self.progress_remover
-        # *********************** 单线程方案 end ***********************
 
     def run(self):
         # 记录开始时间
@@ -721,9 +718,10 @@ class SubtitleRemover:
             tbar.update(1)
             self.progress_total = 100
         else:
-            if config.ACCURATE_MODE:
+            if config.MODE == 'ACCURATE':
+                self.propainter_mode(sub_list, continuous_frame_no_list, tbar)
+            elif config.MODE == 'NORMAL':
                 self.sttn_mode(sub_list, continuous_frame_no_list, tbar)
-                # self.propainter_mode(sub_list, continuous_frame_no_list, tbar)
             else:
                 self.lama_mode(sub_list, tbar)
         self.video_cap.release()
