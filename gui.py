@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import backend.main
 
+
 class SubtitleRemoverGUI:
 
     def __init__(self):
@@ -272,7 +273,7 @@ class SubtitleRemoverGUI:
                 def task():
                     while self.video_paths:
                         video_path = self.video_paths.pop()
-                        self.sr = backend.main.SubtitleRemover(video_path, subtitle_area)
+                        self.sr = backend.main.SubtitleRemover(video_path, subtitle_area, True)
                         self.sr.run()
                 Thread(target=task, daemon=True).start()
                 self.video_cap.release()

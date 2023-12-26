@@ -448,12 +448,14 @@ class SubtitleDetect:
 
 
 class SubtitleRemover:
-    def __init__(self, vd_path, sub_area=None):
+    def __init__(self, vd_path, sub_area=None, gui_mode=False):
         importlib.reload(config)
         # 线程锁
         self.lock = threading.RLock()
         # 用户指定的字幕区域位置
         self.sub_area = sub_area
+        # 是否为gui运行，gui运行需要显示预览
+        self.gui_mode = gui_mode
         # 判断是否为图片
         self.is_picture = False
         if str(vd_path).endswith(('.bmp', '.dib', '.png', '.jpg', '.jpeg', '.pbm', '.pgm', '.ppm', '.tif', '.tiff')):
@@ -626,7 +628,8 @@ class SubtitleRemover:
                                         print(
                                             f'write frame: {start_frame_no + inner_index} with mask {sub_list[index]}')
                                         inner_index += 1
-                                        self.preview_frame = cv2.hconcat([batch[i], inpainted_frame])
+                                        if self.gui_mode:
+                                            self.preview_frame = cv2.hconcat([batch[i], inpainted_frame])
                                 self.update_progress(tbar, increment=len(batch))
         # *********************** 批推理方案 end ***********************
 
@@ -676,7 +679,8 @@ class SubtitleRemover:
                             self.video_writer.write(inpainted_frame)
                             print(f'write frame: {start_frame_index + inner_index} with mask {sub_list[start_frame_index]}')
                             inner_index += 1
-                            self.preview_frame = cv2.hconcat([batch[i], inpainted_frame])
+                            if self.gui_mode:
+                                self.preview_frame = cv2.hconcat([batch[i], inpainted_frame])
                     self.update_progress(tbar, increment=len(batch))
 
     def lama_mode(self, sub_list, tbar):
@@ -696,7 +700,8 @@ class SubtitleRemover:
                     frame = cv2.inpaint(frame, mask, 3, cv2.INPAINT_TELEA)
                 else:
                     frame = self.lama_inpaint(frame, mask)
-            self.preview_frame = cv2.hconcat([original_frame, frame])
+            if self.gui_mode:
+                self.preview_frame = cv2.hconcat([original_frame, frame])
             if self.is_picture:
                 cv2.imencode(self.ext, frame)[1].tofile(self.video_out_name)
             else:
@@ -725,7 +730,8 @@ class SubtitleRemover:
             original_frame = cv2.imread(self.video_path)
             mask = create_mask(original_frame.shape[0:2], sub_list[1])
             inpainted_frame = self.lama_inpaint(original_frame, mask)
-            self.preview_frame = cv2.hconcat([original_frame, inpainted_frame])
+            if self.gui_mode:
+                self.preview_frame = cv2.hconcat([original_frame, inpainted_frame])
             cv2.imencode(self.ext, inpainted_frame)[1].tofile(self.video_out_name)
             tbar.update(1)
             self.progress_total = 100
