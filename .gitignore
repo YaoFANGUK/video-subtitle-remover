@@ -371,3 +371,4 @@ test*_no_sub*.mp4
 /local_test/
 /backend/models/video/ProPainter.pth
 /backend/models/big-lama/big-lama.pt
+/test/debug/

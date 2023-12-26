@@ -1,5 +1,4 @@
 import copy
-import os
 import time
 
 import cv2
@@ -37,11 +36,13 @@ class STTNInpaint:
         self.neighbor_stride = 5
         self.ref_length = 5
 
-    def __call__(self, frames: List[np.ndarray], mask: np.ndarray):
+    def __call__(self, input_frames: List[np.ndarray], input_mask: np.ndarray):
         """
-        :param frames: 原视频帧
+        :param input_frames: 原视频帧
         :param mask: 字幕区域mask
         """
+        _, mask = cv2.threshold(input_mask, 127, 1, cv2.THRESH_BINARY)
+        mask = mask[:, :, None]
         H_ori, W_ori = mask.shape[:2]
         H_ori = int(H_ori + 0.5)
         W_ori = int(W_ori + 0.5)
@@ -50,7 +51,7 @@ class STTNInpaint:
         inpaint_area = self.get_inpaint_area_by_mask(H_ori, split_h, mask)
         # 初始化帧存储变量
         # 高分辨率帧存储列表
-        frames_hr = copy.deepcopy(frames)
+        frames_hr = copy.deepcopy(input_frames)
         frames_scaled = {}  # 存放缩放后帧的字典
         comps = {}  # 存放补全后帧的字典
         # 存储最终的视频帧
@@ -59,10 +60,11 @@ class STTNInpaint:
             frames_scaled[k] = []  # 为每个去除部分初始化一个列表
 
         # 读取并缩放帧
-        for frame_hr in frames_hr:
+        for j in range(len(frames_hr)):
+            image = frames_hr[j]
             # 对每个去除部分进行切割和缩放
             for k in range(len(inpaint_area)):
-                image_crop = frame_hr[inpaint_area[k][0]:inpaint_area[k][1], :, :]  # 切割
+                image_crop = image[inpaint_area[k][0]:inpaint_area[k][1], :, :]  # 切割
                 image_resize = cv2.resize(image_crop, (self.model_input_width, self.model_input_height))  # 缩放
                 frames_scaled[k].append(image_resize)  # 将缩放后的帧添加到对应列表
 
@@ -82,12 +84,8 @@ class STTNInpaint:
                     # 获取遮罩区域并进行图像合成
                     mask_area = mask[inpaint_area[k][0]:inpaint_area[k][1], :]  # 取出遮罩区域
                     # 实现遮罩区域内的图像融合
-                    frame[inpaint_area[k][0]:inpaint_area[k][1], :, :] = mask_area * comp + \
-                                                                         (1 - mask_area) * frame[
-                                                                                           inpaint_area[k][0]:
-                                                                                           inpaint_area[k][1], :, :]
+                    frame[inpaint_area[k][0]:inpaint_area[k][1], :, :] = mask_area * comp + (1 - mask_area) * frame[inpaint_area[k][0]:inpaint_area[k][1], :, :]
                 # 将最终帧添加到列表
-                print(f'processing frame, {len(frames_hr) - j} left')
                 inpainted_frames.append(frame)
         return inpainted_frames
 
@@ -221,7 +219,7 @@ class STTNVideoInpaint:
         # 返回视频读取对象、帧信息和视频写入对象
         return reader, frame_info, writer
 
-    def __init__(self, video_path, mask_path=None):
+    def __init__(self, video_path, mask_path=None, clip_gap=None):
         # STTNInpaint视频修复实例初始化
         self.sttn_inpaint = STTNInpaint()
         # 视频和掩码路径
@@ -233,7 +231,10 @@ class STTNVideoInpaint:
             f"{os.path.basename(self.video_path).rsplit('.', 1)[0]}_no_sub.mp4"
         )
         # 配置可在一次处理中加载的最大帧数
-        self.clip_gap = config.MAX_LOAD_NUM
+        if clip_gap is None:
+            self.clip_gap = config.MAX_LOAD_NUM
+        else:
+            self.clip_gap = clip_gap
 
     def __call__(self, mask=None):
         # 读取视频帧信息
@@ -287,11 +288,11 @@ class STTNVideoInpaint:
 
 
 if __name__ == '__main__':
-    video_path = '/home/yao/Documents/Project/video-subtitle-remover/local_test/english1.mp4'
-    mask_path = '/home/yao/Documents/Project/video-subtitle-remover/local_test/english1_mask.png'
+    mask_path = '../../test/test.png'
+    video_path = '../../test/test.mp4'
     # 记录开始时间
     start = time.time()
-    sttn_video_inpaint = STTNVideoInpaint(video_path, mask_path)
+    sttn_video_inpaint = STTNVideoInpaint(video_path, mask_path, clip_gap=20)
     sttn_video_inpaint()
     print(f'video generated at {sttn_video_inpaint.video_out_path}')
     print(f'time cost: {time.time() - start}')
