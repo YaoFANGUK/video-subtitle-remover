@@ -20,8 +20,8 @@ DET_MODEL_BASE = os.path.join(BASE_DIR, 'models')
 DET_MODEL_PATH = os.path.join(DET_MODEL_BASE, MODEL_VERSION, 'ch_det')
 
 # ×××××××××××××××××××× [可以改] start ××××××××××××××××××××
-# 是否使用全局mask
-SKIP_DETECTION = False
+# 是否使用跳过检测
+SKIP_DETECTION = True
 # 单个字符的高度大于宽度阈值
 HEIGHT_WIDTH_DIFFERENCE_THRESHOLD = 10
 # 容忍的像素点偏差

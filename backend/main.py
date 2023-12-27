@@ -859,8 +859,10 @@ class SubtitleRemover:
 
 if __name__ == '__main__':
     multiprocessing.set_start_method("spawn")
-    # 提示用户输入视频路径
+    # 1. 提示用户输入视频路径
     video_path = input(f"Please input video file path: ").strip()
-    # 新建字幕提取对象
-    sd = SubtitleRemover(video_path)
+    # 2. 按以下顺序传入字幕区域
+    # sub_area = (ymin, ymax, xmin, xmax)
+    # 3. 新建字幕提取对象
+    sd = SubtitleRemover(video_path, sub_area=None)
     sd.run()
