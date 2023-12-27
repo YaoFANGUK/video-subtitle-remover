@@ -20,32 +20,34 @@ DET_MODEL_BASE = os.path.join(BASE_DIR, 'models')
 DET_MODEL_PATH = os.path.join(DET_MODEL_BASE, MODEL_VERSION, 'ch_det')
 
 # ×××××××××××××××××××× [可以改] start ××××××××××××××××××××
+# 是否使用全局mask
+SKIP_DETECTION = False
 # 单个字符的高度大于宽度阈值
 HEIGHT_WIDTH_DIFFERENCE_THRESHOLD = 10
 # 容忍的像素点偏差
 PIXEL_TOLERANCE_Y = 20  # 允许检测框纵向偏差50个像素点
 PIXEL_TOLERANCE_X = 20  # 允许检测框横向偏差100个像素点
 # 字幕区域偏移量， 放大诗歌像素点，防止字幕偏移
-SUBTITLE_AREA_DEVIATION_PIXEL = 10
+SUBTITLE_AREA_DEVIATION_PIXEL = 20
 # 20个像素点以内的差距认为是同一行
 TOLERANCE_Y = 20
 # 高度差阈值
 THRESHOLD_HEIGHT_DIFFERENCE = 20
-# 相邻帧出
+# 相邻帧数
 NEIGHBOR_STRIDE = 5
 # 参考帧长度
 REFERENCE_LENGTH = 5
+# 模式列表，请根据自己需求选择inpaint模式
+# ACCURATE模式将消耗大量GPU显存，如果您的显卡显存较少，建议设置为NORMAL
+MODE_LIST = ['FAST', 'NORMAL', 'ACCURATE']
+MODE = 'NORMAL'
 # 【根据自己的GPU显存大小设置】最大同时处理的图片数量，设置越大处理效果越好，但是要求显存越高
 # 1280x720p视频设置80需要25G显存，设置50需要19G显存
 # 720x480p视频设置80需要8G显存，设置50需要7G显存
 MAX_PROCESS_NUM = 70
 # 【根据自己内存大小设置】设置的越大效果越好，但是时间越长
 MAX_LOAD_NUM = 20
-# 模式列表，请根据自己需求选择inpiant模式
-# ACCURATE模式将消耗大量GPU显存，如果您的显卡显存较少，建议设置为NORMAL
-MODE_LIST = ['FAST', 'NORMAL', 'ACCURATE']
-MODE = 'NORMAL'
-# 如果仅需要去除文字区域，则使用FAST
+# 如果仅需要去除文字区域，则可以将SUPER_FAST设置为True
 SUPER_FAST = False
 # ×××××××××××××××××××× [可以改] start ××××××××××××××××××××
 
@@ -83,4 +85,6 @@ os.chmod(FFMPEG_PATH, stat.S_IRWXU+stat.S_IRWXG+stat.S_IRWXO)
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 if SUPER_FAST:
     MODE = 'FAST'
+if SKIP_DETECTION:
+    MODE = 'NORMAL'
 # ×××××××××××××××××××× [不要改] end ××××××××××××××××××××

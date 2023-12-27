@@ -78,8 +78,16 @@ def create_mask(size, coords_list):
         for coords in coords_list:
             xmin, xmax, ymin, ymax = coords
             # 为了避免框过小，放大10个像素
-            cv2.rectangle(mask, (xmin - config.SUBTITLE_AREA_DEVIATION_PIXEL, ymin - config.SUBTITLE_AREA_DEVIATION_PIXEL),
-                          (xmax + config.SUBTITLE_AREA_DEVIATION_PIXEL, ymax + config.SUBTITLE_AREA_DEVIATION_PIXEL), (255, 255, 255), thickness=-1)
+            x1 = xmin - config.SUBTITLE_AREA_DEVIATION_PIXEL
+            if x1 < 0:
+                x1 = 0
+            y1 = ymin - config.SUBTITLE_AREA_DEVIATION_PIXEL
+            if y1 < 0:
+                y1 = 0
+            x2 = xmax + config.SUBTITLE_AREA_DEVIATION_PIXEL
+            y2 = ymax + config.SUBTITLE_AREA_DEVIATION_PIXEL
+            cv2.rectangle(mask, (x1, y1),
+                          (x2, y2), (255, 255, 255), thickness=-1)
     return mask
 
 

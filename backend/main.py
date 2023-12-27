@@ -5,12 +5,15 @@ from pathlib import Path
 import threading
 import cv2
 import sys
+
+import numpy as np
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
 from backend.scenedetect import scene_detect
 from backend.scenedetect.detectors import ContentDetector
-from backend.inpaint.sttn_inpaint import STTNInpaint
+from backend.inpaint.sttn_inpaint import STTNInpaint, STTNVideoInpaint
 from backend.inpaint.lama_inpaint import LamaInpaint
 from backend.inpaint.video_inpaint import VideoInpaint
 from backend.tools.inpaint_tools import create_mask, batch_generator
@@ -567,8 +570,10 @@ class SubtitleRemover:
         self.progress_total = 50 + self.progress_remover
 
     def propainter_mode(self, sub_list, continuous_frame_no_list, tbar):
-        # *********************** 批推理方案 start ***********************
         print('use propainter mode')
+        scene_div_points = self.sub_detector.get_scene_div_frame_no(self.video_path)
+        continuous_frame_no_list = self.sub_detector.split_range_by_scene(continuous_frame_no_list,
+                                                                          scene_div_points)
         self.video_inpaint = VideoInpaint(config.MAX_PROCESS_NUM)
         index = 0
         while True:
@@ -647,7 +652,20 @@ class SubtitleRemover:
                                         if self.gui_mode:
                                             self.preview_frame = cv2.hconcat([batch[i], inpainted_frame])
                                 self.update_progress(tbar, increment=len(batch))
-        # *********************** 批推理方案 end ***********************
+
+    def sttn_mode_with_no_detection(self):
+        """
+        选中区域，不进行字幕检测
+        """
+        print('use sttn mode with no detection')
+        if self.sub_area is not None:
+            ymin, ymax, xmin, xmax = self.sub_area
+            mask_area_coordinates = [(xmin, xmax, ymin, ymax)]
+            mask = create_mask(self.mask_size, mask_area_coordinates)
+            sttn_video_inpaint = STTNVideoInpaint(self.video_path)
+            sttn_video_inpaint(input_mask=mask, input_video_writer=self.video_writer)
+        else:
+            print('please set subtitle area first')
 
     def sttn_mode(self, sub_list, continuous_frame_no_list, tbar):
         # *********************** 批推理方案 start ***********************
@@ -747,17 +765,10 @@ class SubtitleRemover:
         start_time = time.time()
         # 重置进度条
         self.progress_total = 0
-        # 寻找字幕帧
-        sub_list = self.sub_detector.find_subtitle_frame_no(sub_remover=self)
-        continuous_frame_no_list = self.sub_detector.find_continuous_ranges_with_same_mask(sub_list)
-        # 获取场景分割的帧号
-        scene_div_points = self.sub_detector.get_scene_div_frame_no(self.video_path)
-        continuous_frame_no_list = self.sub_detector.split_range_by_scene(continuous_frame_no_list, scene_div_points)
         tbar = tqdm(total=int(self.frame_count), unit='frame', position=0, file=sys.__stdout__,
                     desc='Subtitle Removing')
-        print('[Processing] start removing subtitles...')
-
         if self.is_picture:
+            sub_list = self.sub_detector.find_subtitle_frame_no(sub_remover=self)
             self.lama_inpaint = LamaInpaint()
             original_frame = cv2.imread(self.video_path)
             mask = create_mask(original_frame.shape[0:2], sub_list[1])
@@ -768,12 +779,22 @@ class SubtitleRemover:
             tbar.update(1)
             self.progress_total = 100
         else:
-            if config.MODE == 'ACCURATE':
-                self.propainter_mode(sub_list, continuous_frame_no_list, tbar)
-            elif config.MODE == 'NORMAL':
-                self.sttn_mode(sub_list, continuous_frame_no_list, tbar)
+            # 是否跳过字幕帧寻找
+            if config.SKIP_DETECTION:
+                # 若跳过则世界使用sttn模式
+                print('[Processing] start removing subtitles...')
+                self.sttn_mode_with_no_detection()
             else:
-                self.lama_mode(sub_list, tbar)
+                sub_list = self.sub_detector.find_subtitle_frame_no(sub_remover=self)
+                continuous_frame_no_list = self.sub_detector.find_continuous_ranges_with_same_mask(sub_list)
+                print('[Processing] start removing subtitles...')
+                # 精准模式下，获取场景分割的帧号，进一步切割
+                if config.MODE == 'ACCURATE':
+                    self.propainter_mode(sub_list, continuous_frame_no_list, tbar)
+                elif config.MODE == 'NORMAL':
+                    self.sttn_mode(sub_list, continuous_frame_no_list, tbar)
+                else:
+                    self.lama_mode(sub_list, tbar)
         self.video_cap.release()
         self.video_writer.release()
         if not self.is_picture:
