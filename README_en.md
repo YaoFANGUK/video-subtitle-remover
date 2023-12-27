@@ -15,15 +15,15 @@ Video-subtitle-remover (VSR) is an AI-based software that removes hardcoded subt
 
 <p style="text-align:center;"><img src="https://github.com/YaoFANGUK/video-subtitle-remover/raw/main/design/demo.png" alt="demo.png"/></p>
 
-> Download the .7z package directly, extract, and run it. If it cannot run, follow the tutorial below to try installing the conda environment and running the source code.
+> Download the .zip package directly, extract, and run it. If it cannot run, follow the tutorial below to try installing the conda environment and running the source code.
 
 **Download Links:**
 
-Windows GPU Version v1.0.0 (GPU):
+Windows GPU Version v1.1.0 (GPU):
 
-- Baidu Cloud Disk: <a href="https://pan.baidu.com/s/1t0djUPjQ96X8U9HisyoiYA?pwd=vsr1">vsr_windows_gpu_v1.0.0.7z</a> Extraction Code: **vsr1**
+- Baidu Cloud Disk: <a href="https://pan.baidu.com/s/1Ms_20ypDD66SGExWVJEVHQ?pwd=vsr1">vsr_windows_gpu_v1.1.0.zip</a> Extraction Code: **vsr1**
 
-- Google Drive: <a href="https://drive.google.com/drive/folders/1NRgLNoHHOmdO4GxLhkPbHsYfMOB_3Elr?usp=sharing">vsr_windows_gpu_v1.0.0.7z</a>
+- Google Drive: <a href="https://drive.google.com/drive/folders/1NRgLNoHHOmdO4GxLhkPbHsYfMOB_3Elr?usp=sharing">vsr_windows_gpu_v1.1.0.zip</a>
 
 > For use only by users with Nvidia graphics cards (AMD graphics cards are not supported).
 
