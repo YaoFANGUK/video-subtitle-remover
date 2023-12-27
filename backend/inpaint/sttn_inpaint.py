@@ -33,8 +33,8 @@ class STTNInpaint:
         # 模型输入用的宽和高
         self.model_input_width, self.model_input_height = 640, 120
         # 2. 设置相连帧数
-        self.neighbor_stride = 5
-        self.ref_length = 5
+        self.neighbor_stride = config.NEIGHBOR_STRIDE
+        self.ref_length = config.REFERENCE_LENGTH
 
     def __call__(self, input_frames: List[np.ndarray], input_mask: np.ndarray):
         """

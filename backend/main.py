@@ -262,8 +262,8 @@ class SubtitleDetect:
         to_merge_point = None  # 保存点，以便尝试与后续区间合并
 
         for i, (start, end) in enumerate(intervals):
-            # 永远不会尝试合并本身长度大于等于5的区间
-            if end - start >= 5:
+            # 永远不会尝试合并本身长度大于等于REFERENCE_LENGTH的区间
+            if end - start >= config.REFERENCE_LENGTH:
                 processed_intervals.append((start, end))
                 continue
 
@@ -276,7 +276,7 @@ class SubtitleDetect:
                     # 保存点，以便稍后尝试与后一个区间合并
                     to_merge_point = (start, end)
 
-            # 如果区间长度小于5
+            # 如果区间长度小于REFERENCE_LENGTH
             else:
                 # 尝试与后一个区间合并
                 if i + 1 < len(intervals) and intervals[i + 1][0] == end + 1:
@@ -694,6 +694,10 @@ class SubtitleRemover:
                 # 1. 获取当前批次的mask坐标全集
                 for mask_index in range(start_frame_index, end_frame_index):
                     for area in sub_list[mask_index]:
+                        xmin, xmax, ymin, ymax = area
+                        # 判断是不是非字幕区域(如果宽大于长，则认为是错误检测)
+                        if (ymax - ymin) - (xmax - xmin) > config.HEIGHT_WIDTH_DIFFERENCE_THRESHOLD:
+                            continue
                         if area not in mask_area_coordinates:
                             mask_area_coordinates.append(area)
                 # 1. 获取当前批次使用的mask

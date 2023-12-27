@@ -20,6 +20,8 @@ DET_MODEL_BASE = os.path.join(BASE_DIR, 'models')
 DET_MODEL_PATH = os.path.join(DET_MODEL_BASE, MODEL_VERSION, 'ch_det')
 
 # ×××××××××××××××××××× [可以改] start ××××××××××××××××××××
+# 单个字符的高度大于宽度阈值
+HEIGHT_WIDTH_DIFFERENCE_THRESHOLD = 10
 # 容忍的像素点偏差
 PIXEL_TOLERANCE_Y = 20  # 允许检测框纵向偏差50个像素点
 PIXEL_TOLERANCE_X = 20  # 允许检测框横向偏差100个像素点
@@ -29,6 +31,10 @@ SUBTITLE_AREA_DEVIATION_PIXEL = 10
 TOLERANCE_Y = 20
 # 高度差阈值
 THRESHOLD_HEIGHT_DIFFERENCE = 20
+# 相邻帧出
+NEIGHBOR_STRIDE = 5
+# 参考帧长度
+REFERENCE_LENGTH = 5
 # 【根据自己的GPU显存大小设置】最大同时处理的图片数量，设置越大处理效果越好，但是要求显存越高
 # 1280x720p视频设置80需要25G显存，设置50需要19G显存
 # 720x480p视频设置80需要8G显存，设置50需要7G显存
