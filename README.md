@@ -191,7 +191,7 @@ python ./backend/main.py
 | Tshuang | 20.00 RMB | 银牌赞助席位 |
 | 很奇异| 15.00 RMB | 银牌赞助席位 |
 | 何斐| 10.00 RMB | 铜牌赞助席位 |
-| [老猫](lanmaoba.com)| 8.80 RMB | 铜牌赞助席位 |
+| [老猫](http://lanmaoba.com)| 8.80 RMB | 铜牌赞助席位 |
 | 长缨在手| 6.00 RMB | 铜牌赞助席位 |
 | Stephen| 2.00 RMB | 铜牌赞助席位 |
 | Leo| 1.00 RMB | 铜牌赞助席位 |
