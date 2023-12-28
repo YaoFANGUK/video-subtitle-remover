@@ -21,7 +21,7 @@ Video-subtitle-remover (VSR) is an AI-based software that removes hardcoded subt
 
 Windows GPU Version v1.1.0 (GPU):
 
-- Baidu Cloud Disk: <a href="https://pan.baidu.com/s/1Ms_20ypDD66SGExWVJEVHQ?pwd=vsr1">vsr_windows_gpu_v1.1.0.zip</a> Extraction Code: **vsr1**
+- Baidu Cloud Disk: <a href="https://pan.baidu.com/s/1zR6CjRztmOGBbOkqK8R1Ng?pwd=vsr1">vsr_windows_gpu_v1.1.0.zip</a> Extraction Code: **vsr1**
 
 - Google Drive: <a href="https://drive.google.com/drive/folders/1NRgLNoHHOmdO4GxLhkPbHsYfMOB_3Elr?usp=sharing">vsr_windows_gpu_v1.1.0.zip</a>
 
