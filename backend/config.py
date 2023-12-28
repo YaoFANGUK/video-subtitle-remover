@@ -86,14 +86,14 @@ PIXEL_TOLERANCE_X = 20  # 允许检测框横向偏差的像素点数
 # ×××××××××× InpaintMode.STTN算法设置 start ××××××××××
 # 以下参数仅适用STTN算法时，才生效
 # 是否使用跳过检测，跳过字幕检测会省去很大时间，但是可能误伤无字幕的视频帧
-STTN_SKIP_DETECTION = False
+STTN_SKIP_DETECTION = True
 # 相邻帧数, 调大会增加显存占用，效果变好
 STTN_NEIGHBOR_STRIDE = 10
 # 参考帧长度, 调大会增加显存占用，效果变好
 STTN_REFERENCE_LENGTH = 10
 # 设置STTN算法最大同时处理的帧数量，设置越大速度越慢，但效果越好
 # 要保证STTN_MAX_LOAD_NUM大于STTN_NEIGHBOR_STRIDE和STTN_REFERENCE_LENGTH
-STTN_MAX_LOAD_NUM = 20
+STTN_MAX_LOAD_NUM = 30
 if STTN_MAX_LOAD_NUM < max(STTN_NEIGHBOR_STRIDE, STTN_REFERENCE_LENGTH):
     STTN_MAX_LOAD_NUM = max(STTN_NEIGHBOR_STRIDE, STTN_REFERENCE_LENGTH)
 # ×××××××××× InpaintMode.STTN算法设置 end ××××××××××

@@ -662,7 +662,7 @@ class SubtitleRemover:
                                             self.preview_frame = cv2.hconcat([batch[i], inpainted_frame])
                                 self.update_progress(tbar, increment=len(batch))
 
-    def sttn_mode_with_no_detection(self):
+    def sttn_mode_with_no_detection(self, tbar):
         """
         使用sttn对选中区域进行重绘，不进行字幕检测
         """
@@ -673,7 +673,7 @@ class SubtitleRemover:
             mask_area_coordinates = [(xmin, xmax, ymin, ymax)]
             mask = create_mask(self.mask_size, mask_area_coordinates)
             sttn_video_inpaint = STTNVideoInpaint(self.video_path)
-            sttn_video_inpaint(input_mask=mask, input_video_writer=self.video_writer)
+            sttn_video_inpaint(input_mask=mask, input_sub_remover=self, tbar=tbar)
         else:
             print('please set subtitle area first')
 
@@ -681,7 +681,7 @@ class SubtitleRemover:
         # 是否跳过字幕帧寻找
         if config.STTN_SKIP_DETECTION:
             # 若跳过则世界使用sttn模式
-            self.sttn_mode_with_no_detection()
+            self.sttn_mode_with_no_detection(tbar)
         else:
             print('use sttn mode')
             sttn_inpaint = STTNInpaint()
