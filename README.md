@@ -12,6 +12,7 @@ Video-subtitle-remover (VSR) 是一款基于AI技术，将视频中的硬字幕�
 - 通过超强AI算法模型，对去除字幕文本的区域进行填充（非相邻像素填充与马赛克去除）
 - 支持自定义字幕位置，仅去除定义位置中的字幕（传入位置）
 - 支持全视频自动去除所有文本（不传入位置）
+- 支持多选图片批量去除水印文本
 
 <p style="text-align:center;"><img src="https://github.com/YaoFANGUK/video-subtitle-remover/raw/main/design/demo.png" alt="demo.png"/></p>
 
