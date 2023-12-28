@@ -774,8 +774,11 @@ class SubtitleRemover:
             sub_list = self.sub_detector.find_subtitle_frame_no(sub_remover=self)
             self.lama_inpaint = LamaInpaint()
             original_frame = cv2.imread(self.video_path)
-            mask = create_mask(original_frame.shape[0:2], sub_list[1])
-            inpainted_frame = self.lama_inpaint(original_frame, mask)
+            if len(sub_list):
+                mask = create_mask(original_frame.shape[0:2], sub_list[1])
+                inpainted_frame = self.lama_inpaint(original_frame, mask)
+            else:
+                inpainted_frame = original_frame
             if self.gui_mode:
                 self.preview_frame = cv2.hconcat([original_frame, inpainted_frame])
             cv2.imencode(self.ext, inpainted_frame)[1].tofile(self.video_out_name)
