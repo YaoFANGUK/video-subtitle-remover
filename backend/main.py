@@ -171,36 +171,39 @@ class SubtitleDetect:
 
     def unify_regions(self, raw_regions):
         """将连续相似的区域统一，保持列表结构。"""
-        keys = sorted(raw_regions.keys())  # 对键进行排序以确保它们是连续的
-        unified_regions = {}
+        if len(raw_regions) > 0:
+            keys = sorted(raw_regions.keys())  # 对键进行排序以确保它们是连续的
+            unified_regions = {}
 
-        # 初始化
-        last_key = keys[0]
-        unify_value_map = {last_key: raw_regions[last_key]}
+            # 初始化
+            last_key = keys[0]
+            unify_value_map = {last_key: raw_regions[last_key]}
 
-        for key in keys[1:]:
-            current_regions = raw_regions[key]
+            for key in keys[1:]:
+                current_regions = raw_regions[key]
 
-            # 新增一个列表来存放匹配过的标准区间
-            new_unify_values = []
+                # 新增一个列表来存放匹配过的标准区间
+                new_unify_values = []
 
-            for idx, region in enumerate(current_regions):
-                last_standard_region = unify_value_map[last_key][idx] if idx < len(unify_value_map[last_key]) else None
+                for idx, region in enumerate(current_regions):
+                    last_standard_region = unify_value_map[last_key][idx] if idx < len(unify_value_map[last_key]) else None
 
-                # 如果当前的区间与前一个键的对应区间相似，我们统一它们
-                if last_standard_region and self.are_similar(region, last_standard_region):
-                    new_unify_values.append(last_standard_region)
-                else:
-                    new_unify_values.append(region)
+                    # 如果当前的区间与前一个键的对应区间相似，我们统一它们
+                    if last_standard_region and self.are_similar(region, last_standard_region):
+                        new_unify_values.append(last_standard_region)
+                    else:
+                        new_unify_values.append(region)
 
-            # 更新unify_value_map为最新的区间值
-            unify_value_map[key] = new_unify_values
-            last_key = key
+                # 更新unify_value_map为最新的区间值
+                unify_value_map[key] = new_unify_values
+                last_key = key
 
-        # 将最终统一后的结果传递给unified_regions
-        for key in keys:
-            unified_regions[key] = unify_value_map[key]
-        return unified_regions
+            # 将最终统一后的结果传递给unified_regions
+            for key in keys:
+                unified_regions[key] = unify_value_map[key]
+            return unified_regions
+        else:
+            return raw_regions
 
     @staticmethod
     def find_continuous_ranges(subtitle_frame_no_box_dict):
