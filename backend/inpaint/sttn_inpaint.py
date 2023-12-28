@@ -33,8 +33,8 @@ class STTNInpaint:
         # 模型输入用的宽和高
         self.model_input_width, self.model_input_height = 640, 120
         # 2. 设置相连帧数
-        self.neighbor_stride = config.NEIGHBOR_STRIDE
-        self.ref_length = config.REFERENCE_LENGTH
+        self.neighbor_stride = config.STTN_NEIGHBOR_STRIDE
+        self.ref_length = config.STTN_REFERENCE_LENGTH
 
     def __call__(self, input_frames: List[np.ndarray], input_mask: np.ndarray):
         """
@@ -229,7 +229,7 @@ class STTNVideoInpaint:
         )
         # 配置可在一次处理中加载的最大帧数
         if clip_gap is None:
-            self.clip_gap = config.MAX_LOAD_NUM
+            self.clip_gap = config.STTN_MAX_LOAD_NUM
         else:
             self.clip_gap = clip_gap
 

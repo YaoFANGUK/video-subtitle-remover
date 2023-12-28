@@ -103,7 +103,7 @@ def inpaint_video(video_path, sub_list):
         index += 1
         if index in sub_list.keys():
             frame_to_inpaint_list.append((index, frame, sub_list[index]))
-        if len(frame_to_inpaint_list) > config.MAX_LOAD_NUM:
+        if len(frame_to_inpaint_list) > config.PROPAINTER_MAX_LOAD_NUM:
             batch_results = parallel_inference(frame_to_inpaint_list)
             for index, frame in batch_results:
                 file_name = f'/home/yao/Documents/Project/video-subtitle-remover/test/temp/{index}.png'

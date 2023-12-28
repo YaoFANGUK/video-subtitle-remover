@@ -1,4 +1,5 @@
 import warnings
+from enum import Enum, unique
 warnings.filterwarnings('ignore')
 import os
 import torch
@@ -7,6 +8,7 @@ import platform
 import stat
 from fsplit.filesplit import Filesplit
 import paddle
+# ×××××××××××××××××××× [不要改] start ××××××××××××××××××××
 paddle.disable_signal_handler()
 logging.disable(logging.DEBUG)  # 关闭DEBUG日志的打印
 logging.disable(logging.WARNING)  # 关闭WARNING日志的打印
@@ -19,40 +21,6 @@ MODEL_VERSION = 'V4'
 DET_MODEL_BASE = os.path.join(BASE_DIR, 'models')
 DET_MODEL_PATH = os.path.join(DET_MODEL_BASE, MODEL_VERSION, 'ch_det')
 
-# ×××××××××××××××××××× [可以改] start ××××××××××××××××××××
-# 是否使用跳过检测
-SKIP_DETECTION = True
-# 单个字符的高度大于宽度阈值
-HEIGHT_WIDTH_DIFFERENCE_THRESHOLD = 10
-# 容忍的像素点偏差
-PIXEL_TOLERANCE_Y = 20  # 允许检测框纵向偏差50个像素点
-PIXEL_TOLERANCE_X = 20  # 允许检测框横向偏差100个像素点
-# 字幕区域偏移量， 放大诗歌像素点，防止字幕偏移
-SUBTITLE_AREA_DEVIATION_PIXEL = 20
-# 20个像素点以内的差距认为是同一行
-TOLERANCE_Y = 20
-# 高度差阈值
-THRESHOLD_HEIGHT_DIFFERENCE = 20
-# 相邻帧数
-NEIGHBOR_STRIDE = 5
-# 参考帧长度
-REFERENCE_LENGTH = 5
-# 模式列表，请根据自己需求选择inpaint模式
-# ACCURATE模式将消耗大量GPU显存，如果您的显卡显存较少，建议设置为NORMAL
-MODE_LIST = ['FAST', 'NORMAL', 'ACCURATE']
-MODE = 'NORMAL'
-# 【根据自己的GPU显存大小设置】最大同时处理的图片数量，设置越大处理效果越好，但是要求显存越高
-# 1280x720p视频设置80需要25G显存，设置50需要19G显存
-# 720x480p视频设置80需要8G显存，设置50需要7G显存
-MAX_PROCESS_NUM = 70
-# 【根据自己内存大小设置】设置的越大效果越好，但是时间越长
-MAX_LOAD_NUM = 20
-# 如果仅需要去除文字区域，则可以将SUPER_FAST设置为True
-SUPER_FAST = False
-# ×××××××××××××××××××× [可以改] start ××××××××××××××××××××
-
-
-# ×××××××××××××××××××× [不要改] start ××××××××××××××××××××
 # 查看该路径下是否有模型完整文件，没有的话合并小文件生成完整文件
 if 'big-lama.pt' not in (os.listdir(LAMA_MODEL_PATH)):
     fs = Filesplit()
@@ -80,11 +48,62 @@ if 'ffmpeg.exe' not in os.listdir(os.path.join(BASE_DIR, '', 'ffmpeg', 'win_x64'
     fs = Filesplit()
     fs.merge(input_dir=os.path.join(BASE_DIR, '', 'ffmpeg', 'win_x64'))
 # 将ffmpeg添加可执行权限
-os.chmod(FFMPEG_PATH, stat.S_IRWXU+stat.S_IRWXG+stat.S_IRWXO)
-
+os.chmod(FFMPEG_PATH, stat.S_IRWXU + stat.S_IRWXG + stat.S_IRWXO)
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-if SUPER_FAST:
-    MODE = 'FAST'
-if SKIP_DETECTION:
-    MODE = 'NORMAL'
 # ×××××××××××××××××××× [不要改] end ××××××××××××××××××××
+
+
+@unique
+class InpaintMode(Enum):
+    """
+    图像重绘算法枚举
+    """
+    STTN = 'sttn'
+    LAMA = 'lama'
+    PROPAINTER = 'propainter'
+
+
+# ×××××××××××××××××××× [可以改] start ××××××××××××××××××××
+
+# ×××××××××× 通用设置 start ××××××××××
+# 【设置inpaint算法】
+# - InpaintMode.STTN 算法：对于真人视频效果较好，速度快，可以跳过字幕检测
+# - InpaintMode.LAMA 算法：对于动画类视频效果好，速度一般，不可以字幕检测
+# - InpaintMode.PROPAINTER 算法： 需要消耗大量显存，速度较慢，对运动非常剧烈的视频效果较好
+MODE = InpaintMode.STTN
+# 【设置像素点偏差】
+# 用于判断是不是非字幕区域(一般认为字幕文本框的长度是要大于宽度的，如果字幕框的高大于宽，且大于的幅度超过指定像素点大小，则认为是错误检测)
+THRESHOLD_HEIGHT_WIDTH_DIFFERENCE = 10
+# 用于放大mask大小，防止自动检测的文本框过小，inpaint阶段出现文字边，有残留
+SUBTITLE_AREA_DEVIATION_PIXEL = 20
+# 同于判断两个文本框是否为同一行字幕，高度差距指定像素点以内认为是同一行
+THRESHOLD_HEIGHT_DIFFERENCE = 20
+# 用于判断两个字幕文本的矩形框是否相似，如果X轴和Y轴偏差都在指定阈值内，则认为时同一个文本框
+PIXEL_TOLERANCE_Y = 20  # 允许检测框纵向偏差的像素点数
+PIXEL_TOLERANCE_X = 20  # 允许检测框横向偏差的像素点数
+# ×××××××××× 通用设置 end ××××××××××
+
+# ×××××××××× InpaintMode.STTN算法设置 start ××××××××××
+# 以下参数仅适用STTN算法时，才生效
+# 是否使用跳过检测，跳过字幕检测会省去很大时间，但是可能误伤无字幕的视频帧
+STTN_SKIP_DETECTION = False
+# 相邻帧数
+STTN_NEIGHBOR_STRIDE = 5
+# 参考帧长度
+STTN_REFERENCE_LENGTH = 5
+# 设置STTN算法最大同时处理的帧数量，设置越大速度越慢，但效果越好
+STTN_MAX_LOAD_NUM = 20
+# ×××××××××× InpaintMode.STTN算法设置 end ××××××××××
+
+# ×××××××××× InpaintMode.PROPAINTER算法设置 start ××××××××××
+# 【根据自己的GPU显存大小设置】最大同时处理的图片数量，设置越大处理效果越好，但是要求显存越高
+# 1280x720p视频设置80需要25G显存，设置50需要19G显存
+# 720x480p视频设置80需要8G显存，设置50需要7G显存
+PROPAINTER_MAX_LOAD_NUM = 70
+# ×××××××××× InpaintMode.PROPAINTER算法设置 end ××××××××××
+
+# ×××××××××× InpaintMode.LAMA算法设置 start ××××××××××
+# 是否开启极速模式，开启后不保证inpaint效果，仅仅对包含文本的区域文本进行去除
+LAMA_SUPER_FAST = False
+# ×××××××××× InpaintMode.LAMA算法设置 end ××××××××××
+# ×××××××××××××××××××× [可以改] end ××××××××××××××××××××
