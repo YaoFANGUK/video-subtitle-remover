@@ -291,10 +291,10 @@ class STTNVideoInpaint:
                         mask_area = mask[inpaint_area[k][0]:inpaint_area[k][1], :]
                         frame[inpaint_area[k][0]:inpaint_area[k][1], :, :] = mask_area * comp + (1 - mask_area) * frame[inpaint_area[k][0]:inpaint_area[k][1], :, :]
                     writer.write(frame)
-                    if input_sub_remover is not None and input_sub_remover.gui_mode:
+                    if input_sub_remover is not None:
                         if tbar is not None:
                             input_sub_remover.update_progress(tbar, increment=1)
-                        if original_frame is not None:
+                        if original_frame is not None and input_sub_remover.gui_mode:
                             input_sub_remover.preview_frame = cv2.hconcat([original_frame, frame])
         # 释放视频写入对象
         writer.release()

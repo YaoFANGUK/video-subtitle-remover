@@ -670,12 +670,14 @@ class SubtitleRemover:
         print('[Processing] start removing subtitles...')
         if self.sub_area is not None:
             ymin, ymax, xmin, xmax = self.sub_area
-            mask_area_coordinates = [(xmin, xmax, ymin, ymax)]
-            mask = create_mask(self.mask_size, mask_area_coordinates)
-            sttn_video_inpaint = STTNVideoInpaint(self.video_path)
-            sttn_video_inpaint(input_mask=mask, input_sub_remover=self, tbar=tbar)
         else:
-            print('please set subtitle area first')
+            print('[Info] No subtitle area has been set. Video will be processed in full screen. As a result, the final outcome might be suboptimal.')
+            ymin, ymax, xmin, xmax = 0, self.frame_height, 0, self.frame_width
+        mask_area_coordinates = [(xmin, xmax, ymin, ymax)]
+        mask = create_mask(self.mask_size, mask_area_coordinates)
+        sttn_video_inpaint = STTNVideoInpaint(self.video_path)
+        sttn_video_inpaint(input_mask=mask, input_sub_remover=self, tbar=tbar)
+
 
     def sttn_mode(self, tbar):
         # 是否跳过字幕帧寻找
