@@ -267,12 +267,22 @@ class SubtitleRemoverGUI:
                 if self.xmax > self.frame_width:
                     self.xmax = self.frame_width
                 if len(self.video_paths) <= 1:
-                    print(f"{'SubtitleArea'}：({self.ymin},{self.ymax},{self.xmin},{self.xmax})")
                     subtitle_area = (self.ymin, self.ymax, self.xmin, self.xmax)
                 else:
                     print(f"{'Processing multiple videos or images'}")
                     # 先判断每个视频的分辨率是否一致，一致的话设置相同的字幕区域，否则设置为None
-                    subtitle_area = None
+                    global_size = None
+                    for temp_video_path in self.video_paths:
+                        temp_cap = cv2.VideoCapture(temp_video_path)
+                        if global_size is None:
+                            global_size = (int(temp_cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(temp_cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+                        else:
+                            temp_size = (int(temp_cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(temp_cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+                            if temp_size != global_size:
+                                print('not all video/images in same size, processing in full screen')
+                                subtitle_area = None
+                    else:
+                        subtitle_area = (self.ymin, self.ymax, self.xmin, self.xmax)
                 y_p = self.ymin / self.frame_height
                 h_p = (self.ymax - self.ymin) / self.frame_height
                 x_p = self.xmin / self.frame_width
@@ -282,6 +292,8 @@ class SubtitleRemoverGUI:
                 def task():
                     while self.video_paths:
                         video_path = self.video_paths.pop()
+                        if subtitle_area is not None:
+                            print(f"{'SubtitleArea'}：({self.ymin},{self.ymax},{self.xmin},{self.xmax})")
                         self.sr = backend.main.SubtitleRemover(video_path, subtitle_area, True)
                         self.__disable_button()
                         self.sr.run()
