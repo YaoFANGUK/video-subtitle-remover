@@ -15,6 +15,7 @@ import multiprocessing
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import backend.main
+from backend.tools.common_tools import is_image_file
 
 
 class SubtitleRemoverGUI:
@@ -309,7 +310,18 @@ class SubtitleRemoverGUI:
         """
         if event == '-SLIDER-' or event == '-Y-SLIDER-' or event == '-Y-SLIDER-H-' or event == '-X-SLIDER-' or event \
                 == '-X-SLIDER-W-':
-            if self.video_cap is not None and self.video_cap.isOpened():
+            # 判断是否时单张图片
+            if is_image_file(self.video_path):
+                img = cv2.imread(self.video_path)
+                self.window['-Y-SLIDER-H-'].update(range=(0, self.frame_height - values['-Y-SLIDER-']))
+                self.window['-X-SLIDER-W-'].update(range=(0, self.frame_width - values['-X-SLIDER-']))
+                # 画字幕框
+                y = int(values['-Y-SLIDER-'])
+                h = int(values['-Y-SLIDER-H-'])
+                x = int(values['-X-SLIDER-'])
+                w = int(values['-X-SLIDER-W-'])
+                self._update_preview(img, (y, h, x, w))
+            elif self.video_cap is not None and self.video_cap.isOpened():
                 frame_no = int(values['-SLIDER-'])
                 self.video_cap.set(cv2.CAP_PROP_POS_FRAMES, frame_no)
                 ret, frame = self.video_cap.read()
