@@ -233,6 +233,17 @@ class SubtitleRemoverGUI:
                     self.window['-X-SLIDER-W-'].update(w)
                     self._update_preview(frame, (y, h, x, w))
 
+    def __disable_button(self):
+        # 1) 禁止修改字幕滑块区域
+        self.window['-Y-SLIDER-'].update(disabled=True)
+        self.window['-X-SLIDER-'].update(disabled=True)
+        self.window['-Y-SLIDER-H-'].update(disabled=True)
+        self.window['-X-SLIDER-W-'].update(disabled=True)
+        # 2) 禁止再次点击【运行】、【打开】和【识别语言】按钮
+        self.window['-RUN-'].update(disabled=True)
+        self.window['-FILE-'].update(disabled=True)
+        self.window['-FILE_BTN-'].update(disabled=True)
+
     def _run_event_handler(self, event, values):
         """
         当点击运行按钮时：
@@ -244,15 +255,8 @@ class SubtitleRemoverGUI:
             if self.video_cap is None:
                 print('Please Open Video First')
             else:
-                # 1) 禁止修改字幕滑块区域
-                self.window['-Y-SLIDER-'].update(disabled=True)
-                self.window['-X-SLIDER-'].update(disabled=True)
-                self.window['-Y-SLIDER-H-'].update(disabled=True)
-                self.window['-X-SLIDER-W-'].update(disabled=True)
-                # 2) 禁止再次点击【运行】、【打开】和【识别语言】按钮
-                self.window['-RUN-'].update(disabled=True)
-                self.window['-FILE-'].update(disabled=True)
-                self.window['-FILE_BTN-'].update(disabled=True)
+                # 禁用按钮
+                self.__disable_button()
                 # 3) 设定字幕区域位置
                 self.xmin = int(values['-X-SLIDER-'])
                 self.xmax = int(values['-X-SLIDER-'] + values['-X-SLIDER-W-'])
@@ -262,8 +266,13 @@ class SubtitleRemoverGUI:
                     self.ymax = self.frame_height
                 if self.xmax > self.frame_width:
                     self.xmax = self.frame_width
-                print(f"{'SubtitleArea'}：({self.ymin},{self.ymax},{self.xmin},{self.xmax})")
-                subtitle_area = (self.ymin, self.ymax, self.xmin, self.xmax)
+                if len(self.video_paths) <= 1:
+                    print(f"{'SubtitleArea'}：({self.ymin},{self.ymax},{self.xmin},{self.xmax})")
+                    subtitle_area = (self.ymin, self.ymax, self.xmin, self.xmax)
+                else:
+                    print(f"{'Processing multiple videos or images'}")
+                    # 先判断每个视频的分辨率是否一致，一致的话设置相同的字幕区域，否则设置为None
+                    subtitle_area = None
                 y_p = self.ymin / self.frame_height
                 h_p = (self.ymax - self.ymin) / self.frame_height
                 x_p = self.xmin / self.frame_width
@@ -274,6 +283,7 @@ class SubtitleRemoverGUI:
                     while self.video_paths:
                         video_path = self.video_paths.pop()
                         self.sr = backend.main.SubtitleRemover(video_path, subtitle_area, True)
+                        self.__disable_button()
                         self.sr.run()
                 Thread(target=task, daemon=True).start()
                 self.video_cap.release()
