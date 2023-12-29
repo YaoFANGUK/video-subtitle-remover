@@ -678,7 +678,6 @@ class SubtitleRemover:
         sttn_video_inpaint = STTNVideoInpaint(self.video_path)
         sttn_video_inpaint(input_mask=mask, input_sub_remover=self, tbar=tbar)
 
-
     def sttn_mode(self, tbar):
         # 是否跳过字幕帧寻找
         if config.STTN_SKIP_DETECTION:
