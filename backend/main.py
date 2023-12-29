@@ -5,6 +5,7 @@ from pathlib import Path
 import threading
 import cv2
 import sys
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
@@ -184,8 +185,7 @@ class SubtitleDetect:
                 new_unify_values = []
 
                 for idx, region in enumerate(current_regions):
-                    last_standard_region = unify_value_map[last_key][idx] if idx < len(
-                        unify_value_map[last_key]) else None
+                    last_standard_region = unify_value_map[last_key][idx] if idx < len(unify_value_map[last_key]) else None
 
                     # 如果当前的区间与前一个键的对应区间相似，我们统一它们
                     if last_standard_region and self.are_similar(region, last_standard_region):
@@ -292,12 +292,10 @@ class SubtitleDetect:
         for start, end in expanded[1:]:
             last_start, last_end = merged[-1]
             # 检查是否重叠
-            if start <= last_end and (
-                    end - last_start + 1 < target_length or last_end - last_start + 1 < target_length):
+            if start <= last_end and (end - last_start + 1 < target_length or last_end - last_start + 1 < target_length):
                 # 需要合并
                 merged[-1] = (last_start, max(last_end, end))  # 合并区间
-            elif start == last_end + 1 and (
-                    end - last_start + 1 < target_length or last_end - last_start + 1 < target_length):
+            elif start == last_end + 1 and (end - last_start + 1 < target_length or last_end - last_start + 1 < target_length):
                 # 相邻区间也需要合并的场景
                 merged[-1] = (last_start, end)
             else:
@@ -498,10 +496,8 @@ class SubtitleRemover:
         # 视频帧率
         self.fps = self.video_cap.get(cv2.CAP_PROP_FPS)
         # 视频尺寸
-        self.size = (
-        int(self.video_cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(self.video_cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-        self.mask_size = (
-        int(self.video_cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(self.video_cap.get(cv2.CAP_PROP_FRAME_WIDTH)))
+        self.size = (int(self.video_cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(self.video_cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+        self.mask_size = (int(self.video_cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(self.video_cap.get(cv2.CAP_PROP_FRAME_WIDTH)))
         self.frame_height = int(self.video_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         self.frame_width = int(self.video_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         # 创建字幕检测对象
@@ -509,8 +505,7 @@ class SubtitleRemover:
         # 创建视频临时对象，windows下delete=True会有permission denied的报错
         self.video_temp_file = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False)
         # 创建视频写对象
-        self.video_writer = cv2.VideoWriter(self.video_temp_file.name, cv2.VideoWriter_fourcc(*'mp4v'), self.fps,
-                                            self.size)
+        self.video_writer = cv2.VideoWriter(self.video_temp_file.name, cv2.VideoWriter_fourcc(*'mp4v'), self.fps, self.size)
         self.video_out_name = os.path.join(os.path.dirname(self.video_path), f'{self.vd_name}_no_sub.mp4')
         self.video_inpaint = None
         self.lama_inpaint = None
@@ -651,16 +646,14 @@ class SubtitleRemover:
                                         self.lama_inpaint = LamaInpaint()
                                     inpainted_frame = self.lama_inpaint(frame, single_mask)
                                     self.video_writer.write(inpainted_frame)
-                                    print(
-                                        f'write frame: {start_frame_no + inner_index} with mask {sub_list[start_frame_no]}')
+                                    print(f'write frame: {start_frame_no + inner_index} with mask {sub_list[start_frame_no]}')
                                     inner_index += 1
                                     self.update_progress(tbar, increment=1)
                                 elif len(batch) > 1:
                                     inpainted_frames = self.video_inpaint.inpaint(batch, mask)
                                     for i, inpainted_frame in enumerate(inpainted_frames):
                                         self.video_writer.write(inpainted_frame)
-                                        print(
-                                            f'write frame: {start_frame_no + inner_index} with mask {sub_list[index]}')
+                                        print(f'write frame: {start_frame_no + inner_index} with mask {sub_list[index]}')
                                         inner_index += 1
                                         if self.gui_mode:
                                             self.preview_frame = cv2.hconcat([batch[i], inpainted_frame])
@@ -675,8 +668,7 @@ class SubtitleRemover:
         if self.sub_area is not None:
             ymin, ymax, xmin, xmax = self.sub_area
         else:
-            print(
-                '[Info] No subtitle area has been set. Video will be processed in full screen. As a result, the final outcome might be suboptimal.')
+            print('[Info] No subtitle area has been set. Video will be processed in full screen. As a result, the final outcome might be suboptimal.')
             ymin, ymax, xmin, xmax = 0, self.frame_height, 0, self.frame_width
         mask_area_coordinates = [(xmin, xmax, ymin, ymax)]
         mask = create_mask(self.mask_size, mask_area_coordinates)
@@ -865,7 +857,10 @@ class SubtitleRemover:
                 try:
                     os.remove(temp.name)
                 except Exception:
-                    print(f'failed to delete temp file {temp.name}')
+                    if platform.system() in ['Windows']:
+                        pass
+                    else:
+                        print(f'failed to delete temp file {temp.name}')
             self.is_successful_merged = True
         finally:
             temp.close()
