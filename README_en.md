@@ -12,6 +12,7 @@ Video-subtitle-remover (VSR) is an AI-based software that removes hardcoded subt
 - Fills in the removed subtitle text area using a powerful AI algorithm model (non-adjacent pixel filling and mosaic removal).
 - Supports custom subtitle positions by only removing subtitles in the defined location (input position).
 - Supports automatic removal of all text throughout the entire video (without inputting a position).
+- Supports multi-selection of images for batch removal of watermark text.
 
 <p style="text-align:center;"><img src="https://github.com/YaoFANGUK/video-subtitle-remover/raw/main/design/demo.png" alt="demo.png"/></p>
 
@@ -166,12 +167,31 @@ python ./backend/main.py
 ```
 
 ## Common Issues
-1. CondaHTTPError
+
+1. How to deal with slow removal speed
+
+You can greatly increase the removal speed by modifying the parameters in backend/config.py:
+
+```python
+MODE = InpaintMode.STTN  # Set to STTN algorithm
+STTN_SKIP_DETECTION = True # Skip subtitle detection
+```
+
+2. What to do if the video removal results are not satisfactory
+
+Modify the values in backend/config.py and try different removal algorithms. Here is an introduction to the algorithms:
+
+> - **InpaintMode.STTN** algorithm: Good for live-action videos and fast in speed, capable of skipping subtitle detection
+> - **InpaintMode.LAMA** algorithm: Best for images and effective for animated videos, moderate speed, unable to skip subtitle detection
+> - **InpaintMode.PROPAINTER** algorithm: Consumes a significant amount of VRAM, slower in speed, works better for videos with very intense movement
+
+3. CondaHTTPError
 
 Place the .condarc file from the project in the user directory (C:/Users/<your_username>). If the file already exists in the user directory, overwrite it.
 
 Solution: https://zhuanlan.zhihu.com/p/260034241
 
-2. 7z file extraction error
+4. 7z file extraction error
 
 Solution: Upgrade the 7-zip extraction program to the latest version.
+

@@ -68,7 +68,7 @@ class InpaintMode(Enum):
 # ×××××××××× 通用设置 start ××××××××××
 # 【设置inpaint算法】
 # - InpaintMode.STTN 算法：对于真人视频效果较好，速度快，可以跳过字幕检测
-# - InpaintMode.LAMA 算法：对于动画类视频效果好，速度一般，不可以字幕检测
+# - InpaintMode.LAMA 算法：对于动画类视频效果好，速度一般，不可以跳过字幕检测
 # - InpaintMode.PROPAINTER 算法： 需要消耗大量显存，速度较慢，对运动非常剧烈的视频效果较好
 MODE = InpaintMode.STTN
 # 【设置像素点偏差】
