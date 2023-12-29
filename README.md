@@ -167,17 +167,52 @@ python ./backend/main.py
 ```
 
 ## 常见问题
-1. CondaHTTPError
+1. 提取速度慢怎么办
+
+修改backend/config.py中的参数，可以大幅度提高去除速度
+```python
+MODE = InpaintMode.STTN  # 设置为STTN算法
+STTN_SKIP_DETECTION = True # 跳过字幕检测
+```
+
+2. 视频去除效果不好怎么办
+
+修改backend/config.py中的参数，尝试不同的去除算法，算法介绍
+
+> - InpaintMode.STTN 算法：对于真人视频效果较好，速度快，可以跳过字幕检测
+> - InpaintMode.LAMA 算法：对于图片效果最好，对动画类视频效果好，速度一般，不可以跳过字幕检测
+> - InpaintMode.PROPAINTER 算法： 需要消耗大量显存，速度较慢，对运动非常剧烈的视频效果较好
+
+
+- 使用STTN算法
+
+```python
+MODE = InpaintMode.STTN  # 设置为STTN算法
+# 相邻帧数, 调大会增加显存占用，效果变好
+STTN_NEIGHBOR_STRIDE = 10
+# 参考帧长度, 调大会增加显存占用，效果变好
+STTN_REFERENCE_LENGTH = 10
+# 设置STTN算法最大同时处理的帧数量，设置越大速度越慢，但效果越好
+# 要保证STTN_MAX_LOAD_NUM大于STTN_NEIGHBOR_STRIDE和STTN_REFERENCE_LENGTH
+STTN_MAX_LOAD_NUM = 30
+```
+- 使用LAMA算法
+```python
+MODE = InpaintMode.LAMA  # 设置为STTN算法
+LAMA_SUPER_FAST = False  # 保证效果
+```
+
+3. CondaHTTPError
 
 将项目中的.condarc放在用户目录下(C:/Users/<你的用户名>)，如果用户目录已经存在该文件则覆盖
 
 解决方案：https://zhuanlan.zhihu.com/p/260034241
 
-2. 7z文件解压错误
+4. 7z文件解压错误
 
 解决方案：升级7-zip解压程序到最新版本
 
-3. 4090使用cuda 11.7跑不起来
+5. 4090使用cuda 11.7跑不起来
 
 解决方案：改用cuda 11.8
 
