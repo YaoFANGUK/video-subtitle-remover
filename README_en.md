@@ -185,6 +185,26 @@ Modify the values in backend/config.py and try different removal algorithms. Her
 > - **InpaintMode.LAMA** algorithm: Best for images and effective for animated videos, moderate speed, unable to skip subtitle detection
 > - **InpaintMode.PROPAINTER** algorithm: Consumes a significant amount of VRAM, slower in speed, works better for videos with very intense movement
 
+- Using the STTN algorithm
+
+```python
+MODE = InpaintMode.STTN  # Set to STTN algorithm
+# Number of neighboring frames, increasing this will increase memory usage and improve the result
+STTN_NEIGHBOR_STRIDE = 10
+# Length of reference frames, increasing this will increase memory usage and improve the result
+STTN_REFERENCE_LENGTH = 10
+# Set the maximum number of frames processed simultaneously by the STTN algorithm, a larger value leads to slower processing but better results
+# Ensure that STTN_MAX_LOAD_NUM is greater than STTN_NEIGHBOR_STRIDE and STTN_REFERENCE_LENGTH
+STTN_MAX_LOAD_NUM = 30
+```
+- Using the LAMA algorithm
+
+```python
+MODE = InpaintMode.LAMA  # Set to LAMA algorithm
+LAMA_SUPER_FAST = False  # Ensure quality
+```
+
+
 3. CondaHTTPError
 
 Place the .condarc file from the project in the user directory (C:/Users/<your_username>). If the file already exists in the user directory, overwrite it.
