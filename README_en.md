@@ -137,12 +137,12 @@ Please make sure you have already installed Python 3.8+, use conda to create a p
 - Install GPU version of Pytorch:
 
   ```shell 
-  conda install pytorch==2.0.1 torchvision==0.15.2 pytorch-cuda=11.7 -c pytorch -c nvidia
+  conda install pytorch==2.1.0 torchvision==0.16.0 pytorch-cuda=11.8 -c pytorch -c nvidia
   ```
   or use
   
   ```shell 
-  pip install torch==2.0.1 torchvision==0.15.2 --index-url https://download.pytorch.org/whl/cu117
+  pip install torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cu118
   ```
 
 - Install other dependencies:
@@ -215,3 +215,6 @@ Solution: https://zhuanlan.zhihu.com/p/260034241
 
 Solution: Upgrade the 7-zip extraction program to the latest version.
 
+```shell
+pip install torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cu118
+```
