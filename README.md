@@ -137,12 +137,12 @@ conda activate videoEnv
 
 - 安装GPU版本Pytorch:
       
-  ```shell 
-  conda install pytorch==2.0.1 torchvision==0.15.2 pytorch-cuda=11.7 -c pytorch -c nvidia
+  ```shell
+  conda install pytorch==2.1.0 torchvision==0.16.0 pytorch-cuda=11.8 -c pytorch -c nvidia
   ```
   或者使用
-  ```shell 
-  pip install torch==2.0.1 torchvision==0.15.2 --index-url https://download.pytorch.org/whl/cu117
+  ```shell
+  pip install torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cu118
   ```
 
 - 安装其他依赖:
@@ -213,6 +213,10 @@ LAMA_SUPER_FAST = False  # 保证效果
 5. 4090使用cuda 11.7跑不起来
 
 解决方案：改用cuda 11.8
+
+```shell
+pip install torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cu118
+```
 
 ## 赞助
 <img src="https://i.imgur.com/EMCP5Lv.jpeg" width="600">
