@@ -172,7 +172,7 @@ python ./backend/main.py
 修改backend/config.py中的参数，可以大幅度提高去除速度
 ```python
 MODE = InpaintMode.STTN  # 设置为STTN算法
-STTN_SKIP_DETECTION = True # 跳过字幕检测
+STTN_SKIP_DETECTION = True # 跳过字幕检测，跳过后可能会导致要去除的字幕遗漏或者误伤不需要去除字幕的视频帧
 ```
 
 2. 视频去除效果不好怎么办
