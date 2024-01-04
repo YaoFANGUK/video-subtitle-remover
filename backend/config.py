@@ -64,6 +64,8 @@ class InpaintMode(Enum):
 
 
 # ×××××××××××××××××××× [可以改] start ××××××××××××××××××××
+# 是否使用h264编码，如果需要安卓手机分享生成的视频，请打开该选项
+USE_H264 = True
 
 # ×××××××××× 通用设置 start ××××××××××
 # 【设置inpaint算法】
@@ -86,7 +88,8 @@ PIXEL_TOLERANCE_X = 20  # 允许检测框横向偏差的像素点数
 # ×××××××××× InpaintMode.STTN算法设置 start ××××××××××
 # 以下参数仅适用STTN算法时，才生效
 # 是否使用跳过检测，跳过字幕检测会省去很大时间，但是可能误伤无字幕的视频帧
-STTN_SKIP_DETECTION = True
+# 注意：将STTN_SKIP_DETECTION设置为True可能会导致去除的字幕漏了
+STTN_SKIP_DETECTION = False
 # 相邻帧数, 调大会增加显存占用，效果变好
 STTN_NEIGHBOR_STRIDE = 10
 # 参考帧长度, 调大会增加显存占用，效果变好

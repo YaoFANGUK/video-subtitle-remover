@@ -845,7 +845,7 @@ class SubtitleRemover:
                 audio_merge_command = [config.FFMPEG_PATH,
                                        "-y", "-i", self.video_temp_file.name,
                                        "-i", temp.name,
-                                       "-vcodec", "copy",
+                                       "-vcodec", "libx264" if config.USE_H264 else "copy",
                                        "-acodec", "copy",
                                        "-loglevel", "error", self.video_out_name]
                 try:
