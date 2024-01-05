@@ -259,49 +259,40 @@ class SubtitleDetect:
         return Polygon([[s_xmin, s_ymin], [s_xmax, s_ymin], [s_xmax, s_ymax], [s_xmin, s_ymax]])
 
     @staticmethod
-    def expand_and_merge_intervals(intervals, target_length=config.STTN_REFERENCE_LENGTH):
-        """
-        合并传入的字幕起始区间，确保区间大小最低为STTN_REFERENCE_LENGTH
-        """
-        expanded = []
-        # 首先单独处理单点区间以扩展它们
-        for start, end in intervals:
-            if start == end:  # 单点区间
-                # 扩展到接近的目标长度，但保证前后不重叠
-                prev_end = expanded[-1][1] if expanded else float('-inf')
-                next_start = float('inf')
-                # 查找下一个区间的起始点
-                for ns, ne in intervals:
-                    if ns > end:
-                        next_start = ns
-                        break
-                # 确定新的扩展起点和终点
-                new_start = max(start - (target_length - 1) // 2, prev_end + 1)
-                new_end = min(start + (target_length - 1) // 2, next_start - 1)
-                # 如果新的扩展终点在起点前面，说明没有足够空间来进行扩展
-                if new_end < new_start:
-                    new_start, new_end = start, start  # 保持原样
-                expanded.append((new_start, new_end))
-            else:
-                # 非单点区间直接保留，稍后处理任何可能的重叠
-                expanded.append((start, end))
-        # 排序以合并那些因扩展导致重叠的区间
-        expanded.sort(key=lambda x: x[0])
-        # 合并重叠的区间，但仅当它们之间真正重叠且小于目标长度时
-        merged = [expanded[0]]
-        for start, end in expanded[1:]:
-            last_start, last_end = merged[-1]
-            # 检查是否重叠
-            if start <= last_end and (end - last_start + 1 < target_length or last_end - last_start + 1 < target_length):
-                # 需要合并
-                merged[-1] = (last_start, max(last_end, end))  # 合并区间
-            elif start == last_end + 1 and (end - last_start + 1 < target_length or last_end - last_start + 1 < target_length):
-                # 相邻区间也需要合并的场景
-                merged[-1] = (last_start, end)
-            else:
-                # 如果没有重叠且都大于目标长度，则直接保留
-                merged.append((start, end))
-        return merged
+    def expand_and_merge_intervals(intervals, expand_size=config.STTN_NEIGHBOR_STRIDE*config.STTN_REFERENCE_LENGTH, max_length=config.STTN_MAX_LOAD_NUM):
+        # 初始化输出区间列表
+        expanded_intervals = []
+
+        # 对每个原始区间进行扩展
+        for interval in intervals:
+            start, end = interval
+
+            # 扩展至至少 'expand_size' 个单位，但不超过 'max_length' 个单位
+            expansion_amount = max(expand_size - (end - start + 1), 0)
+
+            # 在保证包含原区间的前提下尽可能平分前后扩展量
+            expand_start = max(start - expansion_amount // 2, 1)  # 确保起始点不小于1
+            expand_end = end + expansion_amount // 2
+
+            # 如果扩展后的区间超出了最大长度，进行调整
+            if (expand_end - expand_start + 1) > max_length:
+                expand_end = expand_start + max_length - 1
+
+            # 对于单点的处理，需额外保证有至少 'expand_size' 长度
+            if start == end:
+                if expand_end - expand_start + 1 < expand_size:
+                    expand_end = expand_start + expand_size - 1
+
+            # 检查与前一个区间是否有重叠并进行相应的合并
+            if expanded_intervals and expand_start <= expanded_intervals[-1][1]:
+                previous_start, previous_end = expanded_intervals.pop()
+                expand_start = previous_start
+                expand_end = max(expand_end, previous_end)
+
+            # 添加扩展后的区间至结果列表
+            expanded_intervals.append((expand_start, expand_end))
+
+        return expanded_intervals
 
     def compute_iou(self, box1, box2):
         box1_polygon = self.sub_area_to_polygon(box1)

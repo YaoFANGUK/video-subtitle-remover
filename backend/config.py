@@ -68,10 +68,13 @@ class InpaintMode(Enum):
 USE_H264 = True
 
 # ×××××××××× 通用设置 start ××××××××××
+"""
+MODE可选算法类型
+- InpaintMode.STTN 算法：对于真人视频效果较好，速度快，可以跳过字幕检测
+- InpaintMode.LAMA 算法：对于动画类视频效果好，速度一般，不可以跳过字幕检测
+- InpaintMode.PROPAINTER 算法： 需要消耗大量显存，速度较慢，对运动非常剧烈的视频效果较好
+"""
 # 【设置inpaint算法】
-# - InpaintMode.STTN 算法：对于真人视频效果较好，速度快，可以跳过字幕检测
-# - InpaintMode.LAMA 算法：对于动画类视频效果好，速度一般，不可以跳过字幕检测
-# - InpaintMode.PROPAINTER 算法： 需要消耗大量显存，速度较慢，对运动非常剧烈的视频效果较好
 MODE = InpaintMode.STTN
 # 【设置像素点偏差】
 # 用于判断是不是非字幕区域(一般认为字幕文本框的长度是要大于宽度的，如果字幕框的高大于宽，且大于的幅度超过指定像素点大小，则认为是错误检测)
@@ -87,32 +90,33 @@ PIXEL_TOLERANCE_X = 20  # 允许检测框横向偏差的像素点数
 
 # ×××××××××× InpaintMode.STTN算法设置 start ××××××××××
 # 以下参数仅适用STTN算法时，才生效
-STTN_SKIP_DETECTION = True
 """
-STTN_SKIP_DETECTION
+1. STTN_SKIP_DETECTION
 含义：是否使用跳过检测
 效果：设置为True跳过字幕检测，会省去很大时间，但是可能误伤无字幕的视频帧或者会导致去除的字幕漏了
-"""
-# 参考帧步长
-STTN_NEIGHBOR_STRIDE = 5
-"""
-STTN_NEIGHBOR_STRIDE
-含义：相邻帧数步长, 如果我们需要为第50帧填充缺失的区域，STTN_NEIGHBOR_STRIDE=5，那么算法可能会使用第45帧、第40帧等作为参照。
+
+2. STTN_NEIGHBOR_STRIDE
+含义：相邻帧数步长, 如果需要为第50帧填充缺失的区域，STTN_NEIGHBOR_STRIDE=5，那么算法会使用第45帧、第40帧等作为参照。
 效果：用于控制参考帧选择的密度，较大的步长意味着使用更少、更分散的参考帧，较小的步长意味着使用更多、更集中的参考帧。
-"""
-# 参考帧长度（数量）
-STTN_REFERENCE_LENGTH = 10
-"""
-STTN_REFERENCE_LENGTH
+
+3. STTN_REFERENCE_LENGTH
 含义：参数帧数量，STTN算法会查看每个待修复帧的前后若干帧来获得用于修复的上下文信息
 效果：调大会增加显存占用，处理效果变好，但是处理速度变慢
-"""
 
-# 设置STTN算法最大同时处理的帧数量，设置越大速度越慢，但效果越好
-# 要保证STTN_MAX_LOAD_NUM大于STTN_NEIGHBOR_STRIDE和STTN_REFERENCE_LENGTH
-STTN_MAX_LOAD_NUM = 30
-if STTN_MAX_LOAD_NUM < max(STTN_NEIGHBOR_STRIDE, STTN_REFERENCE_LENGTH):
-    STTN_MAX_LOAD_NUM = max(STTN_NEIGHBOR_STRIDE, STTN_REFERENCE_LENGTH)
+4. STTN_MAX_LOAD_NUM
+含义：STTN算法每次最多加载的视频帧数量
+效果：设置越大速度越慢，但效果越好
+注意：要保证STTN_MAX_LOAD_NUM大于STTN_NEIGHBOR_STRIDE和STTN_REFERENCE_LENGTH
+"""
+STTN_SKIP_DETECTION = False
+# 参考帧步长
+STTN_NEIGHBOR_STRIDE = 5
+# 参考帧长度（数量）
+STTN_REFERENCE_LENGTH = 10
+# 设置STTN算法最大同时处理的帧数量
+STTN_MAX_LOAD_NUM = 100
+if STTN_MAX_LOAD_NUM < STTN_REFERENCE_LENGTH * STTN_NEIGHBOR_STRIDE:
+    STTN_MAX_LOAD_NUM = STTN_REFERENCE_LENGTH * STTN_NEIGHBOR_STRIDE
 # ×××××××××× InpaintMode.STTN算法设置 end ××××××××××
 
 # ×××××××××× InpaintMode.PROPAINTER算法设置 start ××××××××××
