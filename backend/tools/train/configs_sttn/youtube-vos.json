@@ -3,9 +3,9 @@
     "save_dir": "release_model/",
     "data_loader": {
         "name": "youtube-vos",
-        "data_root": "datasets/",
-        "w": 432,
-        "h": 240,
+        "data_root": "datasets_sttn/",
+        "w": 640,
+        "h": 120,
         "sample_length": 5
     },
     "losses": {

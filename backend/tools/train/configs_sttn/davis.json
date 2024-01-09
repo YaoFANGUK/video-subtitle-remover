@@ -4,8 +4,8 @@
     "data_loader": {
         "name": "davis",
         "data_root": "datasets/",
-        "w": 432,
-        "h": 240,
+        "w": 640,
+        "h": 120,
         "sample_length": 5
     },
     "losses": {
