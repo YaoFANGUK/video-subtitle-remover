@@ -204,6 +204,7 @@ LAMA_SUPER_FAST = False  # 保证效果
 > 如果对模型去字幕的效果不满意，可以查看design文件夹里面的训练方法，利用backend/tools/train里面的代码进行训练，然后将训练的模型替换旧模型即可
 
 3. CondaHTTPError
+
 将项目中的.condarc放在用户目录下(C:/Users/<你的用户名>)，如果用户目录已经存在该文件则覆盖
 
 解决方案：https://zhuanlan.zhihu.com/p/260034241
