@@ -231,6 +231,7 @@ pip install torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorc
 | 麦格                        | 100.00 RMB | 金牌赞助席位 |
 | 无痕                        | 100.00 RMB | 金牌赞助席位 |
 | wr                        | 100.00 RMB | 金牌赞助席位 |
+| 陈                        | 100.00 RMB | 金牌赞助席位 |
 | 陈凯                        | 50.00 RMB  | 银牌赞助席位 |
 | Tshuang                   | 20.00 RMB  | 银牌赞助席位 |
 | 很奇异                       | 15.00 RMB  | 银牌赞助席位 |
