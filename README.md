@@ -236,6 +236,7 @@ pip install torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorc
 | 陈凯                        | 50.00 RMB  | 银牌赞助席位 |
 | Tshuang                   | 20.00 RMB  | 银牌赞助席位 |
 | 很奇异                       | 15.00 RMB  | 银牌赞助席位 |
+| 郭鑫                       | 12.00 RMB  | 银牌赞助席位 |
 | 何斐                        | 10.00 RMB  | 铜牌赞助席位 |
 | [老猫](http://lanmaoba.com) | 8.80 RMB   | 铜牌赞助席位 |
 | 伍六七                      | 7.77 RMB   | 铜牌赞助席位 |
