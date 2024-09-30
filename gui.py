@@ -22,8 +22,8 @@ class SubtitleRemoverGUI:
 
     def __init__(self):
         # 初次运行检查运行环境是否正常
-        from paddle import fluid
-        fluid.install_check.run_check()
+        from paddle import utils
+        utils.run_check()
         self.font = 'Arial 10'
         self.theme = 'LightBrown12'
         sg.theme(self.theme)
