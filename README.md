@@ -80,53 +80,60 @@ conda activate videoEnv
 
   <details>
       <summary>Linux用户</summary>
-      <h5>(1) 下载CUDA 11.8</h5>
-      <pre><code>wget https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_520.61.05_linux.run</code></pre>
-      <h5>(2) 安装CUDA 11.8</h5>
-      <pre><code>sudo sh cuda_11.8.0_520.61.05_linux.run</code></pre>
+      <h5>(1) 下载CUDA 11.7</h5>
+      <pre><code>wget https://developer.download.nvidia.com/compute/cuda/11.7.0/local_installers/cuda_11.7.0_515.43.04_linux.run</code></pre>
+      <h5>(2) 安装CUDA 11.7</h5>
+      <pre><code>sudo sh cuda_11.7.0_515.43.04_linux.run</code></pre>
       <p>1. 输入accept</p>
       <img src="https://i.328888.xyz/2023/03/31/iwVoeH.png" width="500" alt="">
-      <p>2. 选中CUDA Toolkit 11.8（如果你没有安装nvidia驱动则选中Driver，如果你已经安装了nvidia驱动请不要选中driver），之后选中install，回车</p>
+      <p>2. 选中CUDA Toolkit 11.7（如果你没有安装nvidia驱动则选中Driver，如果你已经安装了nvidia驱动请不要选中driver），之后选中install，回车</p>
       <img src="https://i.328888.xyz/2023/03/31/iwVThJ.png" width="500" alt="">
       <p>3. 添加环境变量</p>
       <p>在 ~/.bashrc 加入以下内容</p>
       <pre><code># CUDA
-  export PATH=/usr/local/cuda-11.8/bin${PATH:+:${PATH}}
-  export LD_LIBRARY_PATH=/usr/local/cuda-11.8/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}</code></pre>
+  export PATH=/usr/local/cuda-11.7/bin${PATH:+:${PATH}}
+  export LD_LIBRARY_PATH=/usr/local/cuda-11.7/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}</code></pre>
       <p>使其生效</p>
       <pre><code>source ~/.bashrc</code></pre>
-      <h5>(3) 下载cuDNN 8.6.0</h5>
-      <p>国内：<a href="https://pan.baidu.com/s/16zIFsz1SKH5fHzlDAy8Fhw?pwd=57mg">cudnn-linux-x86_64-8.6.0.163_cuda11-archive.tar.xz</a> 提取码：57mg</p>
-      <p>国外：<a href="https://github.com/YaoFANGUK/video-subtitle-remover/releases/download/1.0.0/cudnn-linux-x86_64-8.6.0.163_cuda11-archive.tar.xz">cudnn-linux-x86_64-8.6.0.163_cuda11-archive.tar.xz</a></p>
-      <h5>(4) 安装cuDNN 8.6.0</h5>
-      <pre><code> tar -xf cudnn-linux-x86_64-8.6.0.163_cuda11-archive.tar.xz
-   mv cudnn-linux-x86_64-8.6.0.163_cuda11-archive cuda
-   sudo cp ./cuda/include/* /usr/local/cuda-11.8/include/
-   sudo cp ./cuda/lib/* /usr/local/cuda-11.8/lib64/
-   sudo chmod a+r /usr/local/cuda-11.8/lib64/*
-   sudo chmod a+r /usr/local/cuda-11.8/include/*</code></pre>
+      <h5>(3) 下载cuDNN 8.4.1</h5>
+      <p>国内：<a href="https://pan.baidu.com/s/1Gd_pSVzWfX1G7zCuqz6YYA">cudnn-linux-x86_64-8.4.1.50_cuda11.6-archive.tar.xz</a> 提取码：57mg</p>
+      <p>国外：<a href="https://github.com/YaoFANGUK/video-subtitle-extractor/releases/download/1.0.0/cudnn-linux-x86_64-8.4.1.50_cuda11.6-archive.tar.xz">cudnn-linux-x86_64-8.4.1.50_cuda11.6-archive.tar.xz</a></p>
+      <h5>(4) 安装cuDNN 8.4.1</h5>
+      <pre><code> tar -xf cudnn-linux-x86_64-8.4.1.50_cuda11.6-archive.tar.xz
+   mv cudnn-linux-x86_64-8.4.1.50_cuda11.6-archive cuda
+   sudo cp ./cuda/include/* /usr/local/cuda-11.7/include/
+   sudo cp ./cuda/lib/* /usr/local/cuda-11.7/lib64/
+   sudo chmod a+r /usr/local/cuda-11.7/lib64/*
+   sudo chmod a+r /usr/local/cuda-11.7/include/*</code></pre>
   </details>
 
   <details>
         <summary>Windows用户</summary>
-        <h5>(1) 下载CUDA 11.8</h5>
-        <a href="https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_522.06_windows.exe">cuda_11.8.0_522.06_windows.exe</a>
-        <h5>(2) 安装CUDA 11.8</h5>
-        <h5>(3) 下载cuDNN 8.6.0</h5>
-         <p>国内：<a href="https://pan.baidu.com/s/1Bl5So-Ma8KPaIL1PyDbH-A?pwd=57mg">cudnn-windows-x86_64-8.6.0.163_cuda11-archive.zip</a> 提取码：57mg</p>
-        <p>国外：<a href="https://github.com/YaoFANGUK/video-subtitle-remover/releases/download/1.0.0/cudnn-windows-x86_64-8.6.0.163_cuda11-archive.zip">cudnn-windows-x86_64-8.6.0.163_cuda11-archive.zip</a></p>
-        <h5>(4) 安装cuDNN 8.6.0</h5>
+        <h5>(1) 下载CUDA 11.7</h5>
+        <a href="https://developer.download.nvidia.com/compute/cuda/11.7.0/local_installers/cuda_11.7.0_516.01_windows.exe">cuda_11.7.0_516.01_windows.exe</a>
+        <h5>(2) 安装CUDA 11.7</h5>
+        <h5>(3) 下载cuDNN 8.4.1</h5>
+        <p><a href="https://github.com/YaoFANGUK/video-subtitle-extractor/releases/download/1.0.0/cudnn-windows-x86_64-8.4.1.50_cuda11.6-archive.zip">cudnn-windows-x86_64-8.4.1.50_cuda11.6-archive.zip</a></p>
+        <h5>(4) 安装cuDNN 8.4.1</h5>
         <p>
-           将cuDNN解压后的cuda文件夹中的bin, include, lib目录下的文件复制到C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8\对应目录下
+           将cuDNN解压后的cuda文件夹中的bin, include, lib目录下的文件复制到C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.7\对应目录下
         </p>
     </details>
 
 
 - 安装GPU版本Paddlepaddle:
 
-     ```shell 
-     python -m pip install paddlepaddle-gpu==2.6.1 -i https://pypi.tuna.tsinghua.edu.cn/simple
-     ```
+  - windows:
+
+      ```shell 
+      python -m pip install paddlepaddle-gpu==2.4.2.post117 -f https://www.paddlepaddle.org.cn/whl/windows/mkl/avx/stable.html
+      ```
+
+  - Linux:
+
+      ```shell
+      python -m pip install paddlepaddle-gpu==2.4.2.post117 -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html
+      ```
 
 - 安装GPU版本Pytorch:
       
@@ -211,7 +218,7 @@ LAMA_SUPER_FAST = False  # 保证效果
 解决方案：改用cuda 11.8
 
 ```shell
-pip install torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cu118
+pip install torch==2.1.0 torchvision==0.15.2 --index-url https://download.pytorch.org/whl/cu118
 ```
 
 ## 赞助
