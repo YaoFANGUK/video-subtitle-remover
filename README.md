@@ -96,7 +96,7 @@ conda activate videoEnv
       <p>使其生效</p>
       <pre><code>source ~/.bashrc</code></pre>
       <h5>(3) 下载cuDNN 8.6.0</h5>
-      <p>国内：<a href="https://pan.baidu.com/s/1Gd_pSVzWfX1G7zCuqz6YYA">cudnn-linux-x86_64-8.6.0.163_cuda11-archive.tar.xz</a> 提取码：57mg</p>
+      <p>国内：<a href="https://pan.baidu.com/s/16zIFsz1SKH5fHzlDAy8Fhw?pwd=57mg">cudnn-linux-x86_64-8.6.0.163_cuda11-archive.tar.xz</a> 提取码：57mg</p>
       <p>国外：<a href="https://github.com/YaoFANGUK/video-subtitle-remover/releases/download/1.0.0/cudnn-linux-x86_64-8.6.0.163_cuda11-archive.tar.xz">cudnn-linux-x86_64-8.6.0.163_cuda11-archive.tar.xz</a></p>
       <h5>(4) 安装cuDNN 8.6.0</h5>
       <pre><code> tar -xf cudnn-linux-x86_64-8.6.0.163_cuda11-archive.tar.xz
@@ -113,7 +113,8 @@ conda activate videoEnv
         <a href="https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_522.06_windows.exe">cuda_11.8.0_522.06_windows.exe</a>
         <h5>(2) 安装CUDA 11.8</h5>
         <h5>(3) 下载cuDNN 8.6.0</h5>
-        <p><a href="https://github.com/YaoFANGUK/video-subtitle-remover/releases/download/1.0.0/cudnn-windows-x86_64-8.6.0.163_cuda11-archive.zip">cudnn-windows-x86_64-8.6.0.163_cuda11-archive.zip</a></p>
+         <p>国内：<a href="https://pan.baidu.com/s/1rM3msdQZn5A460MV6lbHhg?pwd=57mg">cudnn-windows-x86_64-8.6.0.163_cuda11-archive.zip</a> 提取码：57mg</p>
+        <p>国外：<a href="https://github.com/YaoFANGUK/video-subtitle-remover/releases/download/1.0.0/cudnn-windows-x86_64-8.6.0.163_cuda11-archive.zip">cudnn-windows-x86_64-8.6.0.163_cuda11-archive.zip</a></p>
         <h5>(4) 安装cuDNN 8.6.0</h5>
         <p>
            将cuDNN解压后的cuda文件夹中的bin, include, lib目录下的文件复制到C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8\对应目录下
