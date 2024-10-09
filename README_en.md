@@ -111,9 +111,9 @@ Please make sure you have already installed Python 3.8+, use conda to create a p
           <h5>(1) Download CUDA 11.7</h5>
           <a href="https://developer.download.nvidia.com/compute/cuda/11.7.0/local_installers/cuda_11.7.0_516.01_windows.exe">cuda_11.7.0_516.01_windows.exe</a>
           <h5>(2) Install CUDA 11.7</h5>
-          <h5>(3) Download cuDNN 8.2.4</h5>
-          <p><a href="https://github.com/YaoFANGUK/video-subtitle-extractor/releases/download/1.0.0/cudnn-windows-x64-v8.2.4.15.zip">cudnn-windows-x64-v8.2.4.15.zip</a></p>
-          <h5>(4) Install cuDNN 8.2.4</h5>
+          <h5>(3) Download cuDNN 8.4.0</h5>
+          <p><a href="https://github.com/YaoFANGUK/video-subtitle-extractor/releases/download/1.0.0/cudnn-windows-x86_64-8.4.0.27_cuda11.6-archive.zip">cudnn-windows-x86_64-8.4.0.27_cuda11.6-archive.zip</a></p>
+          <h5>(4) Install cuDNN 8.4.0</h5>
           <p>
              unzip "cudnn-windows-x64-v8.2.4.15.zip", then move all files in "bin, include, lib" in cuda 
       directory to C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.7\
