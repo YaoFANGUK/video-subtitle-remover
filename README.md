@@ -112,9 +112,9 @@ conda activate videoEnv
         <h5>(1) 下载CUDA 11.7</h5>
         <a href="https://developer.download.nvidia.com/compute/cuda/11.7.0/local_installers/cuda_11.7.0_516.01_windows.exe">cuda_11.7.0_516.01_windows.exe</a>
         <h5>(2) 安装CUDA 11.7</h5>
-        <h5>(3) 下载cuDNN 8.4.1</h5>
-        <p><a href="https://github.com/YaoFANGUK/video-subtitle-extractor/releases/download/1.0.0/cudnn-windows-x86_64-8.4.1.50_cuda11.6-archive.zip">cudnn-windows-x86_64-8.4.1.50_cuda11.6-archive.zip</a></p>
-        <h5>(4) 安装cuDNN 8.4.1</h5>
+        <h5>(3) 下载cuDNN v8.4.0 (April 1st, 2022), for CUDA 11.x</h5>
+        <p><a href="https://developer.nvidia.com/compute/cudnn/secure/8.4.0/local_installers/11.6/cudnn-windows-x86_64-8.4.0.27_cuda11.6-archive.zip">cudnn-windows-x86_64-8.4.0.27_cuda11.6-archive.zip</a></p>
+        <h5>(4) 安装cuDNN 8.4.0</h5>
         <p>
            将cuDNN解压后的cuda文件夹中的bin, include, lib目录下的文件复制到C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.7\对应目录下
         </p>
