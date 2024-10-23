@@ -1,3 +1,4 @@
+import torch
 import shutil
 import subprocess
 import os
@@ -19,7 +20,6 @@ from backend.tools.inpaint_tools import create_mask, batch_generator
 import importlib
 import platform
 import tempfile
-import torch
 import multiprocessing
 from shapely.geometry import Polygon
 import time
