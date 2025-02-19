@@ -223,6 +223,8 @@ pip install torch==2.1.0 torchvision==0.15.2 --index-url https://download.pytorc
 
 ## 赞助
 
+<img src="https://github.com/YaoFANGUK/video-subtitle-extractor/raw/main/design/sponsor.png" width="600">
+
 | 捐赠者                       | 累计捐赠金额     | 赞助席位 |
 |---------------------------|------------| --- |
 | 坤V                        | 400.00 RMB | 金牌赞助席位 |
