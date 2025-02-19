@@ -222,7 +222,6 @@ pip install torch==2.1.0 torchvision==0.15.2 --index-url https://download.pytorc
 ```
 
 ## 赞助
-<img src="https://i.imgur.com/EMCP5Lv.jpeg" width="600">
 
 | 捐赠者                       | 累计捐赠金额     | 赞助席位 |
 |---------------------------|------------| --- |
