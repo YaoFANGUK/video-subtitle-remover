@@ -27,7 +27,40 @@ from tqdm import tqdm
 from tools.infer import utility
 from tools.infer.predict_det import TextDetector
 
-
+# 新增用FFmpeg合并视频类
+class FFmpegVideoWriter:
+    def __init__(self, size, fps, output_file, ffmpeg_params=config.FFMPEG_VIDEO_PARAMS):
+        # size 格式为 (width, height)
+        self.size = size
+        self.fps = fps
+        self.output_file = output_file
+        ffmpeg_cmd = [
+            "ffmpeg",
+            "-y",  # 覆盖输出文件
+            "-f", "rawvideo",              # 输入为原始视频流
+            "-pixel_format", "bgr24",      # OpenCV 默认格式 bgr24
+            "-video_size", f"{size[0]}x{size[1]}",  # 视频尺寸：宽x高
+            "-framerate", str(fps),        # 帧率
+            "-i", "-"                      # 从标准输入读取数据
+        ]
+        # 添加自定义参数，拆分成列表
+        ffmpeg_cmd.extend(ffmpeg_params.split())
+        # 最后追加输出文件名
+        ffmpeg_cmd.append(output_file)
+        print("FFmpeg参数:", " ".join(ffmpeg_cmd))
+        self.process = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE)
+        
+    def write(self, frame):
+        try:
+            self.process.stdin.write(frame.tobytes())
+        except BrokenPipeError:
+            print("FFmpeg 进程意外关闭。")
+            
+    def release(self):
+        if self.process:
+            self.process.stdin.close()
+            self.process.wait()
+            self.process = None
 class SubtitleDetect:
     """
     文本框检测类，用于检测视频帧中是否存在文本框
@@ -541,7 +574,9 @@ class SubtitleRemover:
         # 创建视频临时对象，windows下delete=True会有permission denied的报错
         self.video_temp_file = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False)
         # 创建视频写对象
-        self.video_writer = cv2.VideoWriter(self.video_temp_file.name, cv2.VideoWriter_fourcc(*'mp4v'), self.fps, self.size)
+        # self.video_writer = cv2.VideoWriter(self.video_temp_file.name, cv2.VideoWriter_fourcc(*'mp4v'), self.fps, self.size)
+        # 使用FFmpeg生成视频
+        self.video_writer = FFmpegVideoWriter(self.size, self.fps, self.video_temp_file.name)
         self.video_out_name = os.path.join(os.path.dirname(self.video_path), f'{self.vd_name}_no_sub.mp4')
         self.video_inpaint = None
         self.lama_inpaint = None
@@ -881,9 +916,14 @@ class SubtitleRemover:
                 audio_merge_command = [config.FFMPEG_PATH,
                                        "-y", "-i", self.video_temp_file.name,
                                        "-i", temp.name,
-                                       "-vcodec", "libx264" if config.USE_H264 else "copy",
-                                       "-acodec", "copy",
+                                       "-vcodec", "copy",
+                                    #    "-vcodec", "libx264" if config.USE_H264 else "copy",
+                                    #    "-acodec", "copy",
                                        "-loglevel", "error", self.video_out_name]
+                # 新增自定义音频参数
+                audio_params = config.FFMPEG_AUDIO_PARAMS.replace("\n", " ").split()
+                # 将音频参数追加到合并命令中
+                audio_merge_command.extend(audio_params)
                 try:
                     subprocess.check_output(audio_merge_command, stdin=open(os.devnull), shell=use_shell)
                 except Exception:

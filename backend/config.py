@@ -65,7 +65,7 @@ class InpaintMode(Enum):
 
 # ×××××××××××××××××××× [可以改] start ××××××××××××××××××××
 # 是否使用h264编码，如果需要安卓手机分享生成的视频，请打开该选项
-USE_H264 = True
+# USE_H264 = True
 
 # ×××××××××× 通用设置 start ××××××××××
 """
@@ -130,4 +130,21 @@ PROPAINTER_MAX_LOAD_NUM = 70
 # 是否开启极速模式，开启后不保证inpaint效果，仅仅对包含文本的区域文本进行去除
 LAMA_SUPER_FAST = False
 # ×××××××××× InpaintMode.LAMA算法设置 end ××××××××××
+
+# ×××××××××× FFmpeg参数设置 start ××××××××××
+# 自定义 FFmpeg 音频参数，可以根据需要自行修改
+FFMPEG_AUDIO_PARAMS = "-c:a copy "   # 指定音频编码参数
+# 自定义 FFmpeg 视频参数，可以根据需要自行修改
+FFMPEG_VIDEO_PARAMS = (
+    "-f mp4 "                        # 指定输出格式        
+    "-c:v libx264 "                  # 指定视频编码器
+    "-crf 17 "                       # 视频质量
+    "-profile:v high "               # 编码规格
+    "-preset veryslow "              # 编码速度
+    "-sn "                           # 禁用字幕流
+    # "-map_metadata -1 "              # 删除元数据
+    # "-map_chapters -1 "              # 删除章节信息
+    "-pix_fmt yuv420p"               # 指定像素格式，不能修改
+)
+# ×××××××××× FFmpeg参数设置 end ××××××××××
 # ×××××××××××××××××××× [可以改] end ××××××××××××××××××××
