@@ -21,6 +21,8 @@ import importlib
 import platform
 import tempfile
 import multiprocessing
+import json
+import re
 from shapely.geometry import Polygon
 import time
 from tqdm import tqdm
@@ -35,19 +37,18 @@ class FFmpegVideoWriter:
         self.fps = fps
         self.output_file = output_file
         ffmpeg_cmd = [
-            "ffmpeg",
-            "-y",  # 覆盖输出文件
+            "ffmpeg", "-y",                # 覆盖输出文件
             "-f", "rawvideo",              # 输入为原始视频流
             "-pixel_format", "bgr24",      # OpenCV 默认格式 bgr24
             "-video_size", f"{size[0]}x{size[1]}",  # 视频尺寸：宽x高
             "-framerate", str(fps),        # 帧率
             "-i", "-"                      # 从标准输入读取数据
         ]
-        # 添加自定义参数，拆分成列表
-        ffmpeg_cmd.extend(ffmpeg_params.split())
+        # 添加自定义参数
+        ffmpeg_cmd.extend(ffmpeg_params)
         # 最后追加输出文件名
         ffmpeg_cmd.append(output_file)
-        print("FFmpeg参数:", " ".join(ffmpeg_cmd))
+        # print("FFmpeg参数:", " ".join(ffmpeg_cmd))
         self.process = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE)
         
     def write(self, frame):
@@ -61,6 +62,69 @@ class FFmpegVideoWriter:
             self.process.stdin.close()
             self.process.wait()
             self.process = None
+
+def get_audio_suffix(input_file, audio_codec):
+    """
+    根据-c:a的音频编码器动态获取后缀
+    """
+    default_suffix = "aac"  # 默认后缀
+    try:
+        if audio_codec == "copy":
+            # 使用 ffprobe 检查输入文件音频格式
+            result = subprocess.run(
+                ["ffprobe", "-i", input_file, "-show_streams", "-select_streams", "a", "-loglevel", "quiet"],
+                capture_output=True, text=True, check=True
+            )
+            match = re.search(r"codec_name=([^\s]+)", result.stdout)
+            if match:
+                codec = match.group(1)
+                return f".{codec}"  # 返回音频流格式后缀
+            else:
+                print("无法提取音频编码信息，使用默认后缀")
+                return f".{default_suffix}"
+        else:
+            # 非 copy 模式时，直接使用编码器名作为后缀
+            return f".{audio_codec}" if audio_codec else f".{default_suffix}"
+    except subprocess.CalledProcessError as e:
+        print(f"命令失败，使用默认后缀 {default_suffix}: {e}")
+        return f".{default_suffix}"
+
+def get_video_suffix(input_file, format_name):
+    """
+    根据 -f 参数动态获取视频文件后缀。
+    """
+    default_suffix = "mp4"  # 默认后缀
+    try: 
+        if format_name == "copy":
+            # 使用 ffprobe 检查输入文件的视频流编码器类型
+            result = subprocess.run(
+                ["ffprobe", "-i", input_file, "-show_streams", "-select_streams", "v", "-loglevel", "quiet"],
+                capture_output=True, text=True, check=True
+            )
+            # 提取 codec_name 信息
+            match = re.search(r"codec_name=([^\s]+)", result.stdout)
+            if match:
+                codec = match.group(1)
+                return f".{codec}"  # 返回视频流的实际编码器作为后缀
+            else:
+                print(f"无法提取视频编码信息，使用默认后缀 {default_suffix}")
+                return f".{default_suffix}"
+        else:
+            # 非 copy 模式，根据容器格式动态获取后缀
+            result = subprocess.run(
+                ["ffmpeg", "-h", f"muxer={format_name}"],
+                capture_output=True, text=True, check=True
+            )
+            match = re.search(r"Common extensions: (\S+)", result.stdout)
+            if match:
+                extensions = match.group(1).split(",")
+                # 去掉后缀中可能的多余点（".mp4." -> "mp4"）
+                first_extension = extensions[0].strip(".")
+                return f".{first_extension}" if first_extension else f".{default_suffix}"
+    except subprocess.CalledProcessError as e:
+        print(f"FFmpeg 命令失败，使用默认后缀 {default_suffix}: {e}")
+        return f".{default_suffix}"
+    
 class SubtitleDetect:
     """
     文本框检测类，用于检测视频帧中是否存在文本框
@@ -539,8 +603,6 @@ class SubtitleDetect:
                     new_box_list.append(current_box)
             correct_subtitle_frame_no_box_dict[frame_no] = new_box_list
         return correct_subtitle_frame_no_box_dict
-
-
 class SubtitleRemover:
     def __init__(self, vd_path, sub_area=None, gui_mode=False):
         importlib.reload(config)
@@ -572,12 +634,17 @@ class SubtitleRemover:
         # 创建字幕检测对象
         self.sub_detector = SubtitleDetect(self.video_path, self.sub_area)
         # 创建视频临时对象，windows下delete=True会有permission denied的报错
-        self.video_temp_file = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False)
+        # 根据 FFMPEG 格式参数动态获取后缀
+        self.video_suffix = get_video_suffix(self.video_path, config.FFMPEG_FORMAT_PARAMS[1].strip())
+        self.audio_suffix = get_audio_suffix(self.video_path, config.FFMPEG_AUDIO_PARAMS[1].strip())
+        print(self.video_suffix)
+        print(self.audio_suffix)
+        self.video_temp_file = tempfile.NamedTemporaryFile(suffix=self.video_suffix, delete=False)
         # 创建视频写对象
         # self.video_writer = cv2.VideoWriter(self.video_temp_file.name, cv2.VideoWriter_fourcc(*'mp4v'), self.fps, self.size)
         # 使用FFmpeg生成视频
         self.video_writer = FFmpegVideoWriter(self.size, self.fps, self.video_temp_file.name)
-        self.video_out_name = os.path.join(os.path.dirname(self.video_path), f'{self.vd_name}_no_sub.mp4')
+        self.video_out_name = os.path.join(os.path.dirname(self.video_path), f'{self.vd_name}_no_sub{self.video_suffix}')
         self.video_inpaint = None
         self.lama_inpaint = None
         self.ext = os.path.splitext(vd_path)[-1]
@@ -900,7 +967,7 @@ class SubtitleRemover:
 
     def merge_audio_to_video(self):
         # 创建音频临时对象，windows下delete=True会有permission denied的报错
-        temp = tempfile.NamedTemporaryFile(suffix='.aac', delete=False)
+        temp = tempfile.NamedTemporaryFile(suffix=self.audio_suffix, delete=False)
         audio_extract_command = [config.FFMPEG_PATH,
                                  "-y", "-i", self.video_path,
                                  "-acodec", "copy",
@@ -919,11 +986,10 @@ class SubtitleRemover:
                                        "-vcodec", "copy",
                                     #    "-vcodec", "libx264" if config.USE_H264 else "copy",
                                     #    "-acodec", "copy",
-                                       "-loglevel", "error", self.video_out_name]
-                # 新增自定义音频参数
-                audio_params = config.FFMPEG_AUDIO_PARAMS.replace("\n", " ").split()
-                # 将音频参数追加到合并命令中
-                audio_merge_command.extend(audio_params)
+]
+                # 将自定义音频参数追加到合并命令中
+                audio_merge_command.extend(config.FFMPEG_AUDIO_PARAMS)
+                audio_merge_command.extend(["-loglevel", "error", self.video_out_name])
                 try:
                     subprocess.check_output(audio_merge_command, stdin=open(os.devnull), shell=use_shell)
                 except Exception:

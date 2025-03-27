@@ -132,19 +132,48 @@ LAMA_SUPER_FAST = False
 # ×××××××××× InpaintMode.LAMA算法设置 end ××××××××××
 
 # ×××××××××× FFmpeg参数设置 start ××××××××××
+# 以下参数都是FFmpeg的参数，不懂的话直接用预设即可
 # 自定义 FFmpeg 音频参数，可以根据需要自行修改
-FFMPEG_AUDIO_PARAMS = "-c:a copy "   # 指定音频编码参数
+FFMPEG_AUDIO_PARAMS = [
+    "-c:a", "copy"
+]
 # 自定义 FFmpeg 视频参数，可以根据需要自行修改
-FFMPEG_VIDEO_PARAMS = (
-    "-f mp4 "                        # 指定输出格式        
-    "-c:v libx264 "                  # 指定视频编码器
-    "-crf 17 "                       # 视频质量
-    "-profile:v high "               # 编码规格
-    "-preset veryslow "              # 编码速度
-    "-sn "                           # 禁用字幕流
-    # "-map_metadata -1 "              # 删除元数据
-    # "-map_chapters -1 "              # 删除章节信息
-    "-pix_fmt yuv420p"               # 指定像素格式，不能修改
-)
+# #常规质量预设
+# FFMPEG_FORMAT_PARAMS = [ "-f" , "mp4" ]      # 指定输出格式
+# FFMPEG_VIDEO_PARAMS = [
+#     "-c:v", "libx264",          # 指定视频编码器
+#     "-crf", "22",               # 视频质量
+#     "-profile:v", "high",       # 编码规格
+#     "-preset", "medium",        # 编码速度
+#     "-sn",                      # 禁用字幕流
+    # "-map_metadata", "0",         # 保留元数据
+    # "-map_chapters", "0",         # 保留章节信息
+#     "-pix_fmt", "yuv420p"        # 指定像素格式
+# ]
+#高质量预设
+FFMPEG_FORMAT_PARAMS = [ "-f" , "mp4" ]      # 指定输出格式
+FFMPEG_VIDEO_PARAMS = [
+    "-c:v", "libx264",          # 指定视频编码器
+    "-crf", "17",               # 视频质量
+    "-profile:v", "high",       # 编码规格
+    "-preset", "veryslow",      # 编码速度
+    "-sn",                      # 禁用字幕流
+    "-map_metadata", "0",         # 保留元数据
+    "-map_chapters", "0",         # 保留章节信息
+    "-pix_fmt", "yuv420p"        # 指定像素格式
+]
+#无损预设
+# FFMPEG_FORMAT_PARAMS = [ "-f" , "matroska" ]      # 指定输出格式
+# FFMPEG_VIDEO_PARAMS = [
+#     "-c:v", "libx264",          # 指定视频编码器
+#     "-crf", "0",                # 视频质量
+#     "-qp", "0",
+#     "-profile:v", "high444",    # 编码规格
+#     "-preset", "veryslow",      # 编码速度
+#     "-sn",                      # 禁用字幕流
+#     "-map_metadata", "0",       # 保留元数据
+#     "-map_chapters", "0",       # 保留章节信息
+#     "-pix_fmt", "yuv444p"       # 指定像素格式
+# ]
 # ×××××××××× FFmpeg参数设置 end ××××××××××
 # ×××××××××××××××××××× [可以改] end ××××××××××××××××××××
