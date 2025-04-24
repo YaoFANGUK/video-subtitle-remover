@@ -607,6 +607,10 @@ class SubtitleRemover:
             self.video_out_name = os.path.join(pic_dir, f'{self.vd_name}{self.ext}')
         if torch.cuda.is_available():
             print('use GPU for acceleration')
+        if config.USE_DML:
+            print('use DirectML for acceleration')
+            if config.MODE != config.InpaintMode.STTN:
+                print('Warning: DirectML acceleration is only available for STTN model. Falling back to CPU for other models.')
         for provider in config.ONNX_PROVIDERS:
             print(f"Detected execution provider: {provider}")
 
