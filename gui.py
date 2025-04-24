@@ -21,9 +21,6 @@ from backend.tools.common_tools import is_image_file
 class SubtitleRemoverGUI:
 
     def __init__(self):
-        # 初次运行检查运行环境是否正常
-        from paddle import utils
-        utils.run_check()
         self.font = 'Arial 10'
         self.theme = 'LightBrown12'
         sg.theme(self.theme)

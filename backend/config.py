@@ -7,9 +7,9 @@ import logging
 import platform
 import stat
 from fsplit.filesplit import Filesplit
-import paddle
+import onnxruntime as ort
+
 # ×××××××××××××××××××× [不要改] start ××××××××××××××××××××
-paddle.disable_signal_handler()
 logging.disable(logging.DEBUG)  # 关闭DEBUG日志的打印
 logging.disable(logging.WARNING)  # 关闭WARNING日志的打印
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -50,6 +50,28 @@ if 'ffmpeg.exe' not in os.listdir(os.path.join(BASE_DIR, '', 'ffmpeg', 'win_x64'
 # 将ffmpeg添加可执行权限
 os.chmod(FFMPEG_PATH, stat.S_IRWXU + stat.S_IRWXG + stat.S_IRWXO)
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
+
+# 是否使用ONNX(DirectML/AMD/Intel)
+ONNX_PROVIDERS = []
+available_providers = ort.get_available_providers()
+for provider in available_providers:
+    if provider in [
+        "CPUExecutionProvider"
+    ]:
+        continue
+    if provider not in [
+        "DmlExecutionProvider",         # DirectML，适用于 Windows GPU
+        "ROCMExecutionProvider",        # AMD ROCm
+        "MIGraphXExecutionProvider",    # AMD MIGraphX
+        "VitisAIExecutionProvider",     # AMD VitisAI，适用于 RyzenAI & Windows, 实测和DirectML性能似乎差不多
+        "OpenVINOExecutionProvider",    # Intel GPU
+        "MetalExecutionProvider",       # Apple macOS
+        "CoreMLExecutionProvider",      # Apple macOS
+        "CUDAExecutionProvider",        # Nvidia GPU
+    ]:
+        continue
+    print(f"Detected execution provider: {provider}")
+    ONNX_PROVIDERS.append(provider)
 # ×××××××××××××××××××× [不要改] end ××××××××××××××××××××
 
 
