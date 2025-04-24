@@ -21,9 +21,6 @@ from backend.tools.common_tools import is_image_file
 class SubtitleRemoverGUI:
 
     def __init__(self):
-        # 初次运行检查运行环境是否正常
-        from paddle import utils
-        utils.run_check()
         self.font = 'Arial 10'
         self.theme = 'LightBrown12'
         sg.theme(self.theme)
@@ -73,7 +70,7 @@ class SubtitleRemoverGUI:
         # 创建布局
         self._create_layout()
         # 创建窗口
-        self.window = sg.Window(title='Video Subtitle Remover', layout=self.layout,
+        self.window = sg.Window(title=f'Video Subtitle Remover v{backend.main.config.VERSION}' , layout=self.layout,
                                 icon=self.icon)
         while True:
             # 循环读取事件
