@@ -70,7 +70,7 @@ class SubtitleRemoverGUI:
         # 创建布局
         self._create_layout()
         # 创建窗口
-        self.window = sg.Window(title='Video Subtitle Remover', layout=self.layout,
+        self.window = sg.Window(title=f'Video Subtitle Remover v{backend.main.config.VERSION}' , layout=self.layout,
                                 icon=self.icon)
         while True:
             # 循环读取事件

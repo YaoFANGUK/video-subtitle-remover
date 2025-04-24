@@ -9,6 +9,8 @@ import stat
 from fsplit.filesplit import Filesplit
 import onnxruntime as ort
 
+# 项目版本号
+VERSION = "1.1.1"
 # ×××××××××××××××××××× [不要改] start ××××××××××××××××××××
 logging.disable(logging.DEBUG)  # 关闭DEBUG日志的打印
 logging.disable(logging.WARNING)  # 关闭WARNING日志的打印
