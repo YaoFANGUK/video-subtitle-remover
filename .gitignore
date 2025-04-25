@@ -373,4 +373,3 @@ test*_no_sub*.mp4
 /backend/models/big-lama/big-lama.pt
 /test/debug/
 /backend/tools/train/release_model/
-model.onnx
