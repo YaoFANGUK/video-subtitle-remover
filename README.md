@@ -31,21 +31,6 @@ Windows GPU版本v1.1.0（GPU）：
 
 > 仅供具有Nvidia显卡的用户使用(AMD的显卡不行)
 
-**Docker版本：**
-```shell
-  # Nvidia 10 20 30系显卡
-  docker run -it --rm --gpus all eritpchy/video-subtitle-remover:1.1.1-cuda11.8 
-
-  # Nvidia 40系显卡
-  docker run -it --rm --gpus all eritpchy/video-subtitle-remover:1.1.1-cuda12.6 
-
-  # Nvidia 50系显卡
-  docker run -it --rm --gpus all eritpchy/video-subtitle-remover:1.1.1-cuda12.8 
-
-  # AMD / Intel 独显 集显
-  docker run -it --rm --gpus all eritpchy/video-subtitle-remover:1.1.1-directml 
-```
-
 ## 演示
 
 - GUI版：
