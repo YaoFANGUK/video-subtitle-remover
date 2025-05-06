@@ -3,7 +3,7 @@
 ## Project Introduction
 
 ![License](https://img.shields.io/badge/License-Apache%202-red.svg)
-![python version](https://img.shields.io/badge/Python-3.8+-blue.svg)
+![python version](https://img.shields.io/badge/Python-3.11+-blue.svg)
 ![support os](https://img.shields.io/badge/OS-Windows/macOS/Linux-green.svg)
 
 Video-subtitle-remover (VSR) is an AI-based software that removes hardcoded subtitles from videos. It mainly implements the following functionalities:
@@ -26,7 +26,36 @@ Windows GPU Version v1.1.0 (GPU):
 
 - Google Drive: <a href="https://drive.google.com/drive/folders/1NRgLNoHHOmdO4GxLhkPbHsYfMOB_3Elr?usp=sharing">vsr_windows_gpu_v1.1.0.zip</a>
 
-> For use only by users with Nvidia graphics cards (AMD graphics cards are not supported).
+
+**Pre-built Package Comparison**:
+
+| Pre-built Package Name          | Python | Paddle | Torch | Environment                       | Supported Compute Capability Range |
+|----------------------------------|--------|--------|--------|-----------------------------------|------------------------------------|
+| `vse-windows-directml.7z`        | 3.12   | 3.0.0 | 2.4.1 | Windows without Nvidia GPU         | Universal                         |
+| `vse-windows-nvidia-cuda-11.8.7z`| 3.12   | 3.0.0 | 2.7.0 | CUDA 11.8                         | 3.5 – 8.9                          |
+| `vse-windows-nvidia-cuda-12.6.7z`| 3.12   | 3.0.0 | 2.7.0 | CUDA 12.6                         | 5.0 – 8.9                          |
+| `vse-windows-nvidia-cuda-12.8.7z`| 3.12   | 3.0.0 | 2.7.0 | CUDA 12.8                         | 5.0 – 9.0+                          |
+
+> NVIDIA provides a list of supported compute capabilities for each GPU model. You can refer to the following link: [CUDA GPUs](https://developer.nvidia.com/cuda-gpus) to check which CUDA version is compatible with your GPU.
+
+**Docker Versions:**
+```shell
+  # Nvidia 10, 20, 30 Series Graphics Cards
+  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.1.1-cuda11.8 
+
+  # Nvidia 40 Series Graphics Cards
+  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.1.1-cuda12.6 
+
+  # Nvidia 50 Series Graphics Cards
+  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.1.1-cuda12.8 
+
+  # AMD / Intel Dedicated or Integrated Graphics
+  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.1.1-directml 
+
+  # Demo video, input
+  /vsr/test/test.mp4
+  docker cp vsr:/vsr/test/test_no_sub.mp4 ./
+```
 
 ## Demonstration
 
@@ -40,115 +69,96 @@ Windows GPU Version v1.1.0 (GPU):
 
 ## Source Code Usage Instructions
 
-> **Do not use this project without an Nvidia graphics card**. The minimum requirements are:
->
-> **GPU**: GTX 1060 or higher graphics card
-> 
-> CPU: Supports AVX instruction set
+#### 1. Install Python
 
-#### 1. Download and install Miniconda
+Please ensure that you have installed Python 3.12+.
 
-- Windows: <a href="https://repo.anaconda.com/miniconda/Miniconda3-py38_4.11.0-Windows-x86_64.exe">Miniconda3-py38_4.11.0-Windows-x86_64.exe</a>
+- Windows users can go to the [Python official website](https://www.python.org/downloads/windows/) to download and install Python.
+- MacOS users can install using Homebrew:
+  ```shell
+  brew install python@3.12
+  ```
+- Linux users can install via the package manager, such as on Ubuntu/Debian:
+  ```shell
+  sudo apt update && sudo apt install python3.12 python3.12-venv python3.12-dev
+  ```
 
-- Linux: <a href="https://repo.anaconda.com/miniconda/Miniconda3-py38_4.11.0-Linux-x86_64.sh">Miniconda3-py38_4.11.0-Linux-x86_64.sh</a>
+#### 2. Install Dependencies
 
-#### 2. Create and activate a virtual environment
+It is recommended to use a virtual environment to manage project dependencies to avoid conflicts with the system environment.
 
-(1) Switch to the source code directory:
+(1) Create and activate the virtual environment:
+```shell
+python -m venv videoEnv
+```
 
+- Windows:
+```shell
+videoEnv\\Scripts\\activate
+```
+- MacOS/Linux:
+```shell
+source videoEnv/bin/activate
+```
+
+#### 3. Create and Activate Project Directory
+
+Change to the directory where your source code is located:
 ```shell
 cd <source_code_directory>
 ```
+> For example, if your source code is in the `tools` folder on the D drive and the folder name is `video-subtitle-remover`, use:
+> ```shell
+> cd D:/tools/video-subtitle-remover-main
+> ```
 
-> For example, if your source code is in the `tools` folder on drive D, and the source code folder name is `video-subtitle-remover`, enter `cd D:/tools/video-subtitle-remover-main`.
+#### 4. Install the Appropriate Runtime Environment
 
-(2) Create and activate the conda environment:
+This project supports two runtime modes: CUDA (NVIDIA GPU acceleration) and DirectML (AMD, Intel, and other GPUs/APUs).
 
-```shell
-conda create -n videoEnv python=3.8
-```
+##### (1) CUDA (For NVIDIA GPU users)
 
-```shell
-conda activate videoEnv
-```
+> Make sure your NVIDIA GPU driver supports the selected CUDA version.
 
-#### 3. Install dependencies
+- Recommended CUDA 11.8, corresponding to cuDNN 8.6.0.
 
-Please make sure you have already installed Python 3.8+, use conda to create a project virtual environment and activate the environment (it is recommended to create a virtual environment to run to avoid subsequent problems).
-
-  - Install **CUDA** and **cuDNN**
-
-      <details>
-          <summary>Linux</summary>
-          <h5>(1) Download CUDA 11.7</h5>
-          <pre><code>wget https://developer.download.nvidia.com/compute/cuda/11.7.0/local_installers/cuda_11.7.0_515.43.04_linux.run</code></pre>
-          <h5>(2) Install CUDA 11.7</h5>
-          <pre><code>sudo sh cuda_11.7.0_515.43.04_linux.run</code></pre>
-          <p>1. Input accept</p>
-          <img src="https://i.328888.xyz/2023/03/31/iwVoeH.png" width="500" alt="">
-          <p>2. make sure CUDA Toolkit 11.7 is chosen (If you have already installed driver, do not select Driver)</p>
-          <img src="https://i.328888.xyz/2023/03/31/iwVThJ.png" width="500" alt="">
-          <p>3. Add environment variables</p>
-          <p>add the following content in  <strong>~/.bashrc</strong></p>
-          <pre><code># CUDA
-      export PATH=/usr/local/cuda-11.7/bin${PATH:+:${PATH}}
-      export LD_LIBRARY_PATH=/usr/local/cuda-11.7/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}</code></pre>
-          <p>Make sure it works</p>
-          <pre><code>source ~/.bashrc</code></pre>
-          <h5>(3) Download cuDNN 8.4.1</h5>
-          <p><a href="https://github.com/YaoFANGUK/video-subtitle-extractor/releases/download/1.0.0/cudnn-linux-x86_64-8.4.1.50_cuda11.6-archive.tar.xz">cudnn-linux-x86_64-8.4.1.50_cuda11.6-archive.tar.xz</a></p>
-          <h5>(4) Install cuDNN 8.4.1</h5>
-          <pre><code> tar -xf cudnn-linux-x86_64-8.4.1.50_cuda11.6-archive.tar.xz
-     mv cudnn-linux-x86_64-8.4.1.50_cuda11.6-archive cuda
-     sudo cp ./cuda/include/* /usr/local/cuda-11.7/include/
-     sudo cp ./cuda/lib/* /usr/local/cuda-11.7/lib64/
-     sudo chmod a+r /usr/local/cuda-11.7/lib64/*
-     sudo chmod a+r /usr/local/cuda-11.7/include/*</code></pre>
-      </details>
-
-      <details>
-          <summary>Windows</summary>
-          <h5>(1) Download CUDA 11.7</h5>
-          <a href="https://developer.download.nvidia.com/compute/cuda/11.7.0/local_installers/cuda_11.7.0_516.01_windows.exe">cuda_11.7.0_516.01_windows.exe</a>
-          <h5>(2) Install CUDA 11.7</h5>
-          <h5>(3) Download cuDNN 8.4.0</h5>
-          <p><a href="https://github.com/YaoFANGUK/video-subtitle-extractor/releases/download/1.0.0/cudnn-windows-x86_64-8.4.0.27_cuda11.6-archive.zip">cudnn-windows-x86_64-8.4.0.27_cuda11.6-archive.zip</a></p>
-          <h5>(4) Install cuDNN 8.4.0</h5>
-          <p>
-             unzip "cudnn-windows-x86_64-8.4.0.27_cuda11.6-archive.zip", then move all files in "bin, include, lib" in cuda 
-      directory to C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.7\
-          </p>
-      </details>
-
-
-- Install GPU version of Paddlepaddle:
-  - windows:
-
-      ```shell 
-      python -m pip install paddlepaddle-gpu==2.4.2.post117 -f https://www.paddlepaddle.org.cn/whl/windows/mkl/avx/stable.html
-      ```
-
+- Install CUDA:
+  - Windows: [Download CUDA 11.8](https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_522.06_windows.exe)
   - Linux:
+    ```shell
+    wget https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_520.61.05_linux.run
+    sudo sh cuda_11.8.0_520.61.05_linux.run
+    ```
+  - CUDA is not supported on MacOS.
 
-      ```shell
-      python -m pip install paddlepaddle-gpu==2.4.2.post117 -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html
-      ```
+- Install cuDNN (CUDA 11.8 corresponds to cuDNN 8.6.0):
+  - [Windows cuDNN 8.6.0 Download](https://developer.download.nvidia.cn/compute/redist/cudnn/v8.6.0/local_installers/11.8/cudnn-windows-x86_64-8.6.0.163_cuda11-archive.zip)
+  - [Linux cuDNN 8.6.0 Download](https://developer.download.nvidia.cn/compute/redist/cudnn/v8.6.0/local_installers/11.8/cudnn-linux-x86_64-8.6.0.163_cuda11-archive.tar.xz)
+  - Follow the installation guide in the NVIDIA official documentation.
 
-- Install GPU version of Pytorch:
-
-  ```shell 
-  conda install pytorch==2.1.0 torchvision==0.16.0 pytorch-cuda=11.8 -c pytorch -c nvidia
+- Install PaddlePaddle GPU version (CUDA 11.8):
+  ```shell
+  pip install paddlepaddle-gpu==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu118/
   ```
-  or use
-  
-  ```shell 
-  pip install torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cu118
+
+- Install Torch GPU version (CUDA 11.8):
+  ```shell
+  pip install torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu118
   ```
 
 - Install other dependencies:
-
   ```shell
   pip install -r requirements.txt
+  ```
+
+##### (2) DirectML (For AMD, Intel, and other GPU/APU users)
+
+- Suitable for Windows devices with AMD/NVIDIA/Intel GPUs.
+- Install ONNX Runtime DirectML version:
+  ```shell
+  pip install paddlepaddle==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
+  pip install -r requirements.txt
+  pip install -r requirements_directml.txt
   ```
 
 
@@ -215,6 +225,4 @@ Solution: https://zhuanlan.zhihu.com/p/260034241
 
 Solution: Upgrade the 7-zip extraction program to the latest version.
 
-```shell
-pip install torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cu118
-```
+
