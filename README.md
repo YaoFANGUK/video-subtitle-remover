@@ -27,7 +27,7 @@ Windows GPU版本v1.1.0（GPU）：
 
 - 百度网盘:  <a href="https://pan.baidu.com/s/1zR6CjRztmOGBbOkqK8R1Ng?pwd=vsr1">vsr_windows_gpu_v1.1.0.zip</a> 提取码：**vsr1**
 
-- Google Drive:  <a href="https://drive.google.com/drive/folders/1NRgLNoHHOmdO4GxLhkPbHsYfMOB_3Elr?usp=sharing">vsr_windows_gpu_v1.1.0.zip</a> 
+- Google Drive:  <a href="https://drive.google.com/drive/folders/1NRgLNoHHOmdO4GxLhkPbHsYfMOB_3Elr?usp=sharing">vsr_windows_gpu_v1.1.0.zip</a>
 
 **预构建包对比说明**：
 |       预构建包名          | Python  | Paddle | Torch | 环境                          | 支持的计算能力范围|
@@ -42,16 +42,16 @@ Windows GPU版本v1.1.0（GPU）：
 **Docker版本：**
 ```shell
   # Nvidia 10 20 30系显卡
-  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.1.1-cuda11.8 
+  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.1.1-cuda11.8
 
   # Nvidia 40系显卡
-  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.1.1-cuda12.6 
+  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.1.1-cuda12.6
 
   # Nvidia 50系显卡
-  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.1.1-cuda12.8 
+  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.1.1-cuda12.8
 
   # AMD / Intel 独显 集显
-  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.1.1-directml 
+  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.1.1-directml
 
   # 演示视频, 输入
   /vsr/test/test.mp4
@@ -240,6 +240,7 @@ LAMA_SUPER_FAST = False  # 保证效果
 | 无痕                        | 100.00 RMB | 金牌赞助席位 |
 | wr                        | 100.00 RMB | 金牌赞助席位 |
 | 陈                        | 100.00 RMB | 金牌赞助席位 |
+| lyons                        | 100.00 RMB | 金牌赞助席位 |
 | TalkLuv                   | 50.00 RMB  | 银牌赞助席位 |
 | 陈凯                        | 50.00 RMB  | 银牌赞助席位 |
 | Tshuang                   | 20.00 RMB  | 银牌赞助席位 |
