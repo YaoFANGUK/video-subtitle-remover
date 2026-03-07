@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 Modern GUI for video-subtitle-remover.
 Features:
@@ -13,11 +13,11 @@ from __future__ import annotations
 
 import os
 import queue
+import shutil
 import subprocess
 import sys
 import tempfile
 import threading
-import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
@@ -30,7 +30,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import backend.main  # noqa: E402
-import config as backend_config  # noqa: E402
+from backend import config as backend_config  # noqa: E402
 
 
 MediaPath = str
@@ -101,10 +101,12 @@ class LosslessCutLikeGUI:
         self.timeline_segment_ids: List[Tuple[Tuple[int, int], int]] = []
 
         self.is_playing = False
+        self.ignore_slider_callback = False
         self.last_image_token = None
 
         self.worker: Optional[threading.Thread] = None
         self.log_queue: "queue.Queue[str]" = queue.Queue()
+        self.progress_queue: "queue.Queue[float]" = queue.Queue()
         self.active_sr: Optional["backend.main.SubtitleRemover"] = None
         self.active_progress_base: float = 0.0
         self.active_progress_span: float = 0.0
@@ -205,8 +207,9 @@ class LosslessCutLikeGUI:
         action_box = ttk.Frame(right, style="Card.TFrame")
         action_box.pack(fill=tk.X)
 
-        ttk.Button(action_box, text="导出剪辑（仅 Cut）", style="Pink.TButton", command=self.export_cut_only).pack(fill=tk.X, pady=(0, 8))
+        ttk.Button(action_box, text="导出选中区间", style="Pink.TButton", command=self.export_cut_only).pack(fill=tk.X, pady=(0, 8))
         ttk.Button(action_box, text="去字幕并导出", style="Pink.TButton", command=self.process_and_export).pack(fill=tk.X, pady=(0, 8))
+        ttk.Button(action_box, text="仅处理选中区间并导出完整视频", style="Ghost.TButton", command=self.process_selected_segments_export_full).pack(fill=tk.X, pady=(0, 8))
 
         self.progress_var = tk.DoubleVar(value=0.0)
         self.progress = ttk.Progressbar(action_box, maximum=100.0, variable=self.progress_var)
@@ -258,7 +261,7 @@ class LosslessCutLikeGUI:
             self.frame_h, self.frame_w = image.shape[:2]
             self.frame_count, self.fps, self.current_frame_no = 1, 1.0, 1
             self.frame_slider.configure(to=1)
-            self.frame_slider.set(1)
+            self._set_frame_slider(1)
         else:
             cap = cv2.VideoCapture(file_path)
             if not cap.isOpened():
@@ -271,7 +274,7 @@ class LosslessCutLikeGUI:
             self.frame_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
             self.current_frame_no = 1
             self.frame_slider.configure(to=self.frame_count)
-            self.frame_slider.set(1)
+            self._set_frame_slider(1)
             self.seek_frame(1)
 
         self.media_info_var.set(f"{Path(file_path).name} | {self.frame_w}x{self.frame_h}")
@@ -298,6 +301,8 @@ class LosslessCutLikeGUI:
             self.refresh_timeline()
 
     def on_slider_change(self, value: str) -> None:
+        if self.ignore_slider_callback:
+            return
         if self.worker and self.worker.is_alive():
             return
         if self.is_image:
@@ -322,7 +327,7 @@ class LosslessCutLikeGUI:
             return
         self.current_frame = frame
         self.current_frame_no = min(self.frame_count, self.current_frame_no + 1)
-        self.frame_slider.set(self.current_frame_no)
+        self._set_frame_slider(self.current_frame_no)
         self.frame_text_var.set(f"Frame {self.current_frame_no} / {self.frame_count}")
         self.refresh_preview()
         self.refresh_timeline()
@@ -468,9 +473,9 @@ class LosslessCutLikeGUI:
         def task() -> None:
             try:
                 self.log("开始导出剪辑...")
-                self.progress_var.set(5)
+                self.report_progress(5)
                 self.export_segments_with_ffmpeg(self.media_path, segments, out_path)
-                self.progress_var.set(100)
+                self.report_progress(100)
                 self.log(f"导出完成: {out_path}")
             except Exception as exc:
                 self.log(f"导出失败: {exc}")
@@ -490,21 +495,17 @@ class LosslessCutLikeGUI:
         if not out_path:
             return
 
-        segments = self.selected_segments()
-
         def task() -> None:
-            temp_input = None
-            pipeline_temp_paths: List[str] = []
             try:
                 self.log("开始处理...")
-                self.progress_var.set(1)
+                self.report_progress(1)
                 boxes = [b.normalized() for b in self.selection_boxes if b.is_valid()]
 
                 if self.is_image:
                     if boxes:
                         self.log(f"图片多框逐框处理: {len(boxes)} 个选择框")
                         self.process_image_with_boxes(self.media_path, boxes, out_path)
-                        self.progress_var.set(100)
+                        self.report_progress(100)
                         self.log(f"处理完成: {out_path}")
                         return
                     self.log("图片未选择框，使用后端自动检测处理")
@@ -518,74 +519,72 @@ class LosslessCutLikeGUI:
                     if not os.path.exists(generated):
                         raise RuntimeError("未找到输出文件")
                     os.replace(generated, out_path)
-                    self.progress_var.set(100)
+                    self.report_progress(100)
                     self.log(f"处理完成: {out_path}")
                     return
 
-                # video mode
-                if not self.is_image:
-                    temp_input = self.media_path
-                    if segments != [(1, self.frame_count)]:
-                        self.log("按选中区间裁剪输入视频...")
-                        self.progress_var.set(8)
-                        cut_temp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
-                        cut_temp.close()
-                        self.export_segments_with_ffmpeg(self.media_path, segments, cut_temp.name)
-                        temp_input = cut_temp.name
-                        pipeline_temp_paths.append(cut_temp.name)
-
-                if not boxes:
-                    boxes = [SelectionBox(0, 0, self.frame_w, self.frame_h, "rect")]
+                subtitle_area = self.merged_area_for_backend()
+                if subtitle_area is None:
                     self.log("未选择框，将按全画面处理")
                 else:
-                    self.log(f"视频多框逐框处理: {len(boxes)} 个选择框")
+                    self.log(f"按合并区域处理: {subtitle_area}")
 
-                current_input = temp_input
-                total = len(boxes)
-                for idx, box in enumerate(boxes, start=1):
-                    area = self.box_to_backend_area(box)
-                    self.log(f"处理框 {idx}/{total}: {area}")
-                    self.active_progress_base = 12.0 + (idx - 1) * (84.0 / total)
-                    self.active_progress_span = 84.0 / total
-                    sr = backend.main.SubtitleRemover(current_input, area, True)
-                    self.active_sr = sr
-                    sr.run()
-                    self.active_sr = None
-
-                    generated = sr.video_out_name
-                    if not os.path.exists(generated):
-                        raise RuntimeError(f"第 {idx} 个框处理后未找到输出文件")
-
-                    if idx < total:
-                        next_temp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
-                        next_temp.close()
-                        pipeline_temp_paths.append(next_temp.name)
-                        os.replace(generated, next_temp.name)
-                        if current_input != self.media_path and os.path.exists(current_input):
-                            try:
-                                os.remove(current_input)
-                            except Exception:
-                                pass
-                        current_input = next_temp.name
-                    else:
-                        os.replace(generated, out_path)
-                self.progress_var.set(100)
+                self.active_progress_base = 12.0
+                self.active_progress_span = 84.0
+                sr = backend.main.SubtitleRemover(self.media_path, subtitle_area, True)
+                self.active_sr = sr
+                sr.run()
+                self.active_sr = None
+                generated = sr.video_out_name
+                if not os.path.exists(generated):
+                    raise RuntimeError("未找到输出文件")
+                os.replace(generated, out_path)
+                self.report_progress(100)
                 self.log(f"处理完成: {out_path}")
             except Exception as exc:
                 self.active_sr = None
                 self.log(f"处理失败: {exc}")
-            finally:
-                if temp_input and temp_input != self.media_path and os.path.exists(temp_input):
-                    try:
-                        os.remove(temp_input)
-                    except Exception:
-                        pass
-                for p in pipeline_temp_paths:
-                    if os.path.exists(p):
-                        try:
-                            os.remove(p)
-                        except Exception:
-                            pass
+
+        self.start_worker(task)
+
+    def process_selected_segments_export_full(self) -> None:
+        if not self.media_path:
+            return
+        if self.is_image:
+            messagebox.showinfo("提示", "该功能仅支持视频。")
+            return
+
+        segments = self.selected_segments()
+        if segments == [(1, self.frame_count)]:
+            messagebox.showinfo("提示", "请先使用 B 标记并勾选需要处理的区间。")
+            return
+
+        out_path = filedialog.asksaveasfilename(
+            title="导出完整视频",
+            defaultextension=".mp4",
+            filetypes=[("MP4", "*.mp4")],
+            initialfile=f"{Path(self.media_path).stem}_partial_processed.mp4",
+        )
+        if not out_path:
+            return
+
+        def task() -> None:
+            try:
+                self.log("开始处理选中区间并重组完整视频...")
+                self.report_progress(1)
+                boxes = [b.normalized() for b in self.selection_boxes if b.is_valid()]
+                if not boxes:
+                    boxes = [SelectionBox(0, 0, self.frame_w, self.frame_h, "rect")]
+                    self.log("未选择框，将按全画面处理选中区间")
+                else:
+                    self.log(f"选中区间多框逐框处理: {len(boxes)} 个选择框")
+
+                self.process_selected_segments_and_export_full_video(self.media_path, segments, boxes, out_path)
+                self.report_progress(100)
+                self.log(f"处理完成: {out_path}")
+            except Exception as exc:
+                self.active_sr = None
+                self.log(f"处理失败: {exc}")
 
         self.start_worker(task)
 
@@ -600,7 +599,13 @@ class LosslessCutLikeGUI:
         ss = s % 60
         return f"{hh:02d}:{mm:02d}:{ss:06.3f}"
 
-    def export_segments_with_ffmpeg(self, input_path: str, segments: Sequence[Tuple[int, int]], output_path: str) -> None:
+    def export_segments_with_ffmpeg(
+        self,
+        input_path: str,
+        segments: Sequence[Tuple[int, int]],
+        output_path: str,
+        precise: bool = False,
+    ) -> None:
         ffmpeg = backend_config.FFMPEG_PATH
         if not ffmpeg or not os.path.exists(ffmpeg):
             raise RuntimeError("FFmpeg 不可用，请检查 backend/config.py 中的 FFMPEG_PATH")
@@ -613,21 +618,45 @@ class LosslessCutLikeGUI:
                 part = os.path.join(tmp, f"part_{idx:03d}.mp4")
                 start = self._frame_to_sec(start_f, self.fps)
                 end = self._frame_to_sec(end_f + 1, self.fps)
-                cmd = [
-                    ffmpeg,
-                    "-y",
-                    "-ss",
-                    f"{start:.6f}",
-                    "-to",
-                    f"{end:.6f}",
-                    "-i",
-                    input_path,
-                    "-c",
-                    "copy",
-                    "-avoid_negative_ts",
-                    "1",
-                    part,
-                ]
+                duration = max(0.001, end - start)
+                if precise:
+                    cmd = [
+                        ffmpeg,
+                        "-y",
+                        "-i",
+                        input_path,
+                        "-ss",
+                        f"{start:.6f}",
+                        "-t",
+                        f"{duration:.6f}",
+                        "-c:v",
+                        "libx264",
+                        "-preset",
+                        "fast",
+                        "-crf",
+                        "18",
+                        "-c:a",
+                        "aac",
+                        "-movflags",
+                        "+faststart",
+                        part,
+                    ]
+                else:
+                    cmd = [
+                        ffmpeg,
+                        "-y",
+                        "-ss",
+                        f"{start:.6f}",
+                        "-to",
+                        f"{end:.6f}",
+                        "-i",
+                        input_path,
+                        "-c",
+                        "copy",
+                        "-avoid_negative_ts",
+                        "1",
+                        part,
+                    ]
                 self.run_cmd(cmd)
                 part_files.append(part)
 
@@ -640,6 +669,270 @@ class LosslessCutLikeGUI:
             concat_cmd = [ffmpeg, "-y", "-f", "concat", "-safe", "0", "-i", concat_list, "-c", "copy", output_path]
             self.run_cmd(concat_cmd)
 
+    def extract_audio_with_ffmpeg(self, input_path: str, output_path: str) -> None:
+        ffmpeg = backend_config.FFMPEG_PATH
+        if not ffmpeg or not os.path.exists(ffmpeg):
+            raise RuntimeError("FFmpeg 不可用，请检查 backend/config.py 中的 FFMPEG_PATH")
+        cmd = [
+            ffmpeg,
+            "-y",
+            "-i",
+            input_path,
+            "-vn",
+            "-acodec",
+            "copy",
+            output_path,
+        ]
+        self.run_cmd(cmd)
+
+    def concat_video_parts_video_only_with_ffmpeg(self, parts: Sequence[str], output_path: str) -> None:
+        ffmpeg = backend_config.FFMPEG_PATH
+        if not ffmpeg or not os.path.exists(ffmpeg):
+            raise RuntimeError("FFmpeg 不可用，请检查 backend/config.py 中的 FFMPEG_PATH")
+        if not parts:
+            raise RuntimeError("没有可拼接的视频片段")
+        if len(parts) == 1:
+            cmd = [
+                ffmpeg,
+                "-y",
+                "-i",
+                parts[0],
+                "-map",
+                "0:v:0",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "medium",
+                "-crf",
+                "18",
+                "-an",
+                output_path,
+            ]
+            self.run_cmd(cmd)
+            return
+
+        cmd = [ffmpeg, "-y"]
+        for part in parts:
+            cmd.extend(["-i", part])
+
+        filter_inputs = "".join(f"[{idx}:v:0]" for idx in range(len(parts)))
+        cmd.extend(
+            [
+                "-filter_complex",
+                f"{filter_inputs}concat=n={len(parts)}:v=1:a=0[v]",
+                "-map",
+                "[v]",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "medium",
+                "-crf",
+                "18",
+                "-an",
+                "-movflags",
+                "+faststart",
+                output_path,
+            ]
+        )
+        self.run_cmd(cmd)
+
+    def concat_video_parts_with_ffmpeg(self, parts: Sequence[str], output_path: str) -> None:
+        ffmpeg = backend_config.FFMPEG_PATH
+        if not ffmpeg or not os.path.exists(ffmpeg):
+            raise RuntimeError("FFmpeg 不可用，请检查 backend/config.py 中的 FFMPEG_PATH")
+        if not parts:
+            raise RuntimeError("没有可拼接的视频片段")
+        if len(parts) == 1:
+            shutil.copy2(parts[0], output_path)
+            return
+
+        cmd = [ffmpeg, "-y"]
+        for part in parts:
+            cmd.extend(["-i", part])
+
+        filter_inputs = "".join(f"[{idx}:v:0][{idx}:a:0]" for idx in range(len(parts)))
+        cmd.extend(
+            [
+                "-filter_complex",
+                f"{filter_inputs}concat=n={len(parts)}:v=1:a=1[v][a]",
+                "-map",
+                "[v]",
+                "-map",
+                "[a]",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "medium",
+                "-crf",
+                "18",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "192k",
+                "-movflags",
+                "+faststart",
+                output_path,
+            ]
+        )
+        self.run_cmd(cmd)
+
+    def merge_audio_with_video_ffmpeg(self, video_path: str, audio_path: str, output_path: str) -> None:
+        ffmpeg = backend_config.FFMPEG_PATH
+        if not ffmpeg or not os.path.exists(ffmpeg):
+            raise RuntimeError("FFmpeg 不可用，请检查 backend/config.py 中的 FFMPEG_PATH")
+        cmd = [
+            ffmpeg,
+            "-y",
+            "-i",
+            video_path,
+            "-i",
+            audio_path,
+            "-map",
+            "0:v:0",
+            "-map",
+            "1:a:0",
+            "-c:v",
+            "copy",
+            "-c:a",
+            "copy",
+            "-shortest",
+            "-movflags",
+            "+faststart",
+            output_path,
+        ]
+        self.run_cmd(cmd)
+
+    def process_video_with_boxes(
+        self,
+        input_path: str,
+        boxes: Sequence[SelectionBox],
+        output_path: str,
+        progress_base: float,
+        progress_span: float,
+    ) -> None:
+        pipeline_temp_paths: List[str] = []
+        current_input = input_path
+        total = len(boxes)
+        for idx, box in enumerate(boxes, start=1):
+            area = self.box_to_backend_area(box)
+            self.log(f"处理框 {idx}/{total}: {area}")
+            self.active_progress_base = progress_base + (idx - 1) * (progress_span / total)
+            self.active_progress_span = progress_span / total
+            sr = backend.main.SubtitleRemover(current_input, area, True)
+            self.active_sr = sr
+            sr.run()
+            self.active_sr = None
+
+            generated = sr.video_out_name
+            if not os.path.exists(generated):
+                raise RuntimeError(f"第 {idx} 个框处理后未找到输出文件")
+
+            if idx < total:
+                next_temp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+                next_temp.close()
+                pipeline_temp_paths.append(next_temp.name)
+                os.replace(generated, next_temp.name)
+                if current_input != input_path and os.path.exists(current_input):
+                    try:
+                        os.remove(current_input)
+                    except Exception:
+                        pass
+                current_input = next_temp.name
+            else:
+                os.replace(generated, output_path)
+
+        for p in pipeline_temp_paths:
+            if os.path.exists(p):
+                try:
+                    os.remove(p)
+                except Exception:
+                    pass
+
+    def process_selected_segments_and_export_full_video(
+        self,
+        input_path: str,
+        segments: Sequence[Tuple[int, int]],
+        boxes: Sequence[SelectionBox],
+        output_path: str,
+    ) -> None:
+        assembled_parts: List[str] = []
+        temp_paths: List[str] = []
+        previous_end = 0
+        work_span = 60.0
+        concat_base = 74.0
+        per_segment_span = work_span / max(1, len(segments))
+
+        try:
+            audio_path = tempfile.NamedTemporaryFile(suffix=".mka", delete=False)
+            audio_path.close()
+            temp_paths.append(audio_path.name)
+            self.log("分离原始音轨...")
+            self.report_progress(6)
+            self.extract_audio_with_ffmpeg(input_path, audio_path.name)
+
+            for idx, (start_f, end_f) in enumerate(segments, start=1):
+                if start_f > previous_end + 1:
+                    untouched = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+                    untouched.close()
+                    temp_paths.append(untouched.name)
+                    self.export_segments_with_ffmpeg(
+                        input_path,
+                        [(previous_end + 1, start_f - 1)],
+                        untouched.name,
+                        precise=True,
+                    )
+                    assembled_parts.append(untouched.name)
+
+                raw_segment = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+                raw_segment.close()
+                temp_paths.append(raw_segment.name)
+                self.log(f"裁剪待处理区间 {idx}/{len(segments)}: {start_f}-{end_f}")
+                self.export_segments_with_ffmpeg(input_path, [(start_f, end_f)], raw_segment.name, precise=True)
+
+                processed_segment = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+                processed_segment.close()
+                temp_paths.append(processed_segment.name)
+                self.process_video_with_boxes(
+                    raw_segment.name,
+                    boxes,
+                    processed_segment.name,
+                    progress_base=12.0 + (idx - 1) * per_segment_span,
+                    progress_span=per_segment_span,
+                )
+                assembled_parts.append(processed_segment.name)
+                previous_end = end_f
+
+            if previous_end < self.frame_count:
+                tail = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+                tail.close()
+                temp_paths.append(tail.name)
+                self.export_segments_with_ffmpeg(
+                    input_path,
+                    [(previous_end + 1, self.frame_count)],
+                    tail.name,
+                    precise=True,
+                )
+                assembled_parts.append(tail.name)
+
+            stitched_video = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+            stitched_video.close()
+            temp_paths.append(stitched_video.name)
+            self.report_progress(concat_base)
+            self.log("拼接完整视频轨...")
+            self.concat_video_parts_video_only_with_ffmpeg(assembled_parts, stitched_video.name)
+
+            self.report_progress(90)
+            self.log("合成原始音轨...")
+            self.merge_audio_with_video_ffmpeg(stitched_video.name, audio_path.name, output_path)
+        finally:
+            self.active_sr = None
+            for p in temp_paths:
+                if os.path.exists(p):
+                    try:
+                        os.remove(p)
+                    except Exception:
+                        pass
+
     def process_image_with_boxes(self, input_path: str, boxes: Sequence[SelectionBox], output_path: str) -> None:
         image = self.read_image(input_path)
         if image is None:
@@ -650,7 +943,7 @@ class LosslessCutLikeGUI:
         for idx, box in enumerate(boxes, start=1):
             mask = self.build_shape_mask((h, w), box)
             result = cv2.inpaint(result, mask, 3, cv2.INPAINT_TELEA)
-            self.progress_var.set(8 + 88 * idx / total)
+            self.report_progress(8 + 88 * idx / total)
         self.write_image(output_path, result)
 
     def build_shape_mask(self, hw: Tuple[int, int], box: SelectionBox):
@@ -782,7 +1075,7 @@ class LosslessCutLikeGUI:
         cx1, cy1 = self._image_to_canvas(x1, y1)
         cx2, cy2 = self._image_to_canvas(x2, y2)
         outline = "#FF2D75" if selected else "#FF85AD"
-        fill = "#FFB3CC"
+        fill = ""
 
         if box.shape == "ellipse":
             self.canvas.create_oval(cx1, cy1, cx2, cy2, outline=outline, fill=fill, width=2)
@@ -798,7 +1091,7 @@ class LosslessCutLikeGUI:
         w = max(1, self.timeline_canvas.winfo_width())
         x = max(12, min(w - 12, event.x))
         frame = int(round(((x - 12) / max(1, (w - 24))) * (self.frame_count - 1))) + 1
-        self.frame_slider.set(frame)
+        self._set_frame_slider(frame)
         self.seek_frame(frame)
 
     def refresh_timeline(self) -> None:
@@ -882,6 +1175,16 @@ class LosslessCutLikeGUI:
     def log(self, msg: str) -> None:
         self.log_queue.put(msg)
 
+    def report_progress(self, value: float) -> None:
+        self.progress_queue.put(float(value))
+
+    def _set_frame_slider(self, value: int) -> None:
+        self.ignore_slider_callback = True
+        try:
+            self.frame_slider.set(value)
+        finally:
+            self.ignore_slider_callback = False
+
     def _poll_logs(self) -> None:
         if self.active_sr is not None:
             try:
@@ -892,6 +1195,12 @@ class LosslessCutLikeGUI:
                     self.refresh_preview()
             except Exception:
                 pass
+        while True:
+            try:
+                value = self.progress_queue.get_nowait()
+            except queue.Empty:
+                break
+            self.progress_var.set(value)
         while True:
             try:
                 msg = self.log_queue.get_nowait()
