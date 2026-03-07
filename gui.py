@@ -759,8 +759,8 @@ class LosslessCutLikeGUI:
         self.offset_y = (canvas_h - draw_h) // 2
 
         frame = cv2.resize(self.current_frame, (draw_w, draw_h), interpolation=cv2.INTER_AREA)
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        ok, png = cv2.imencode(".png", rgb)
+        # OpenCV frame is BGR; encode directly to avoid channel swap in Tk preview.
+        ok, png = cv2.imencode(".png", frame)
         if not ok:
             return
 
