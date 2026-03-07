@@ -1,405 +1,908 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
-@Author  : Fang Yao
-@Time    : 2023/4/1 6:07 下午
-@FileName: gui.py
-@desc: 字幕去除器图形化界面
+Modern GUI for video-subtitle-remover.
+Features:
+- Pink themed UI inspired by LosslessCut workflow.
+- Video/image adaptive preview.
+- Snipaste-like drag selection boxes (rect/round-rect/ellipse), multi-box support.
+- B-key marks clip points, pairwise segment generation, segment export.
+- Subtitle removal pipeline integration with backend.main.SubtitleRemover.
 """
+
+from __future__ import annotations
+
 import os
-import configparser
-import PySimpleGUI as sg
-import cv2
+import queue
+import subprocess
 import sys
-from threading import Thread
-import multiprocessing
+import tempfile
+import threading
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import List, Optional, Sequence, Tuple
+
+import cv2
+import tkinter as tk
+from tkinter import filedialog, messagebox, ttk
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import backend.main
-from backend.tools.common_tools import is_image_file
+
+import backend.main  # noqa: E402
+import config as backend_config  # noqa: E402
 
 
-class SubtitleRemoverGUI:
+MediaPath = str
+FrameNo = int
+ShapeType = str
 
-    def __init__(self):
-        self.font = 'Arial 10'
-        self.theme = 'LightBrown12'
-        sg.theme(self.theme)
-        self.icon = os.path.join(os.path.dirname(__file__), 'design', 'vsr.ico')
-        self.screen_width, self.screen_height = sg.Window.get_screen_size()
-        self.subtitle_config_file = os.path.join(os.path.dirname(__file__), 'subtitle.ini')
-        print(self.screen_width, self.screen_height)
-        # 设置视频预览区域大小
-        self.video_preview_width = 960
-        self.video_preview_height = self.video_preview_width * 9 // 16
-        # 默认组件大小
-        self.horizontal_slider_size = (120, 20)
-        self.output_size = (100, 10)
-        self.progressbar_size = (60, 20)
-        # 分辨率低于1080
-        if self.screen_width // 2 < 960:
-            self.video_preview_width = 640
-            self.video_preview_height = self.video_preview_width * 9 // 16
-            self.horizontal_slider_size = (60, 20)
-            self.output_size = (58, 10)
-            self.progressbar_size = (28, 20)
-        # 字幕提取器布局
-        self.layout = None
-        # 字幕提取其窗口
-        self.window = None
-        # 视频路径
-        self.video_path = None
-        # 视频cap
-        self.video_cap = None
-        # 视频的帧率
-        self.fps = None
-        # 视频的帧数
-        self.frame_count = None
-        # 视频的宽
-        self.frame_width = None
-        # 视频的高
-        self.frame_height = None
-        # 设置字幕区域高宽
-        self.xmin = None
-        self.xmax = None
-        self.ymin = None
-        self.ymax = None
-        # 字幕提取器
-        self.sr = None
 
-    def run(self):
-        # 创建布局
-        self._create_layout()
-        # 创建窗口
-        self.window = sg.Window(title=f'Video Subtitle Remover v{backend.main.config.VERSION}' , layout=self.layout,
-                                icon=self.icon)
-        while True:
-            # 循环读取事件
-            event, values = self.window.read(timeout=10)
-            # 处理【打开】事件
-            self._file_event_handler(event, values)
-            # 处理【滑动】事件
-            self._slide_event_handler(event, values)
-            # 处理【运行】事件
-            self._run_event_handler(event, values)
-            # 如果关闭软件，退出
-            if event == sg.WIN_CLOSED:
-                break
-            # 更新进度条
-            if self.sr is not None:
-                self.window['-PROG-'].update(self.sr.progress_total)
-                if self.sr.preview_frame is not None:
-                    self.window['-DISPLAY-'].update(data=cv2.imencode('.png', self._img_resize(self.sr.preview_frame))[1].tobytes())
-                if self.sr.isFinished:
-                    # 1) 打开修改字幕滑块区域按钮
-                    self.window['-Y-SLIDER-'].update(disabled=False)
-                    self.window['-X-SLIDER-'].update(disabled=False)
-                    self.window['-Y-SLIDER-H-'].update(disabled=False)
-                    self.window['-X-SLIDER-W-'].update(disabled=False)
-                    # 2) 打开【运行】、【打开】和【识别语言】按钮
-                    self.window['-RUN-'].update(disabled=False)
-                    self.window['-FILE-'].update(disabled=False)
-                    self.window['-FILE_BTN-'].update(disabled=False)
-                    self.sr = None
-                if len(self.video_paths) >= 1:
-                    # 1) 关闭修改字幕滑块区域按钮
-                    self.window['-Y-SLIDER-'].update(disabled=True)
-                    self.window['-X-SLIDER-'].update(disabled=True)
-                    self.window['-Y-SLIDER-H-'].update(disabled=True)
-                    self.window['-X-SLIDER-W-'].update(disabled=True)
-                    # 2) 关闭【运行】、【打开】和【识别语言】按钮
-                    self.window['-RUN-'].update(disabled=True)
-                    self.window['-FILE-'].update(disabled=True)
-                    self.window['-FILE_BTN-'].update(disabled=True)
+@dataclass
+class SelectionBox:
+    x1: int
+    y1: int
+    x2: int
+    y2: int
+    shape: ShapeType = "rect"
 
-    def _create_layout(self):
-        """
-        创建字幕提取器布局
-        """
-        garbage = os.path.join(os.path.dirname(__file__), 'output')
-        if os.path.exists(garbage):
-            import shutil
-            shutil.rmtree(garbage, True)
-        self.layout = [
-            # 显示视频预览
-            [sg.Image(size=(self.video_preview_width, self.video_preview_height), background_color='black',
-                      key='-DISPLAY-')],
-            # 打开按钮 + 快进快退条
-            [sg.Input(key='-FILE-', visible=False, enable_events=True),
-             sg.FilesBrowse(button_text='Open', file_types=((
-                            'All Files', '*.*'), ('mp4', '*.mp4'),
-                            ('flv', '*.flv'),
-                            ('wmv', '*.wmv'),
-                            ('avi', '*.avi')),
-                            key='-FILE_BTN-', size=(10, 1), font=self.font),
-             sg.Slider(size=self.horizontal_slider_size, range=(1, 1), key='-SLIDER-', orientation='h',
-                       enable_events=True, font=self.font,
-                       disable_number_display=True),
-             ],
-            # 输出区域
-            [sg.Output(size=self.output_size, font=self.font),
-             sg.Frame(title='Vertical', font=self.font, key='-FRAME1-',
-             layout=[[
-                 sg.Slider(range=(0, 0), orientation='v', size=(10, 20),
-                           disable_number_display=True,
-                           enable_events=True, font=self.font,
-                           pad=((10, 10), (20, 20)),
-                           default_value=0, key='-Y-SLIDER-'),
-                 sg.Slider(range=(0, 0), orientation='v', size=(10, 20),
-                           disable_number_display=True,
-                           enable_events=True, font=self.font,
-                           pad=((10, 10), (20, 20)),
-                           default_value=0, key='-Y-SLIDER-H-'),
-             ]], pad=((15, 5), (0, 0))),
-             sg.Frame(title='Horizontal', font=self.font, key='-FRAME2-',
-             layout=[[
-                 sg.Slider(range=(0, 0), orientation='v', size=(10, 20),
-                           disable_number_display=True,
-                           pad=((10, 10), (20, 20)),
-                           enable_events=True, font=self.font,
-                           default_value=0, key='-X-SLIDER-'),
-                 sg.Slider(range=(0, 0), orientation='v', size=(10, 20),
-                           disable_number_display=True,
-                           pad=((10, 10), (20, 20)),
-                           enable_events=True, font=self.font,
-                           default_value=0, key='-X-SLIDER-W-'),
-             ]], pad=((15, 5), (0, 0)))
-             ],
+    def normalized(self) -> "SelectionBox":
+        lx, rx = sorted([self.x1, self.x2])
+        ty, by = sorted([self.y1, self.y2])
+        return SelectionBox(lx, ty, rx, by, self.shape)
 
-            # 运行按钮 + 进度条
-            [sg.Button(button_text='Run', key='-RUN-',
-                       font=self.font, size=(20, 1)),
-             sg.ProgressBar(100, orientation='h', size=self.progressbar_size, key='-PROG-', auto_size_text=True)
-             ],
-        ]
+    def as_xyxy(self) -> Tuple[int, int, int, int]:
+        n = self.normalized()
+        return n.x1, n.y1, n.x2, n.y2
 
-    def _file_event_handler(self, event, values):
-        """
-        当点击打开按钮时：
-        1）打开视频文件，将画布显示视频帧
-        2）获取视频信息，初始化进度条滑块范围
-        """
-        if event == '-FILE-':
-            self.video_paths = values['-FILE-'].split(';')
-            self.video_path = self.video_paths[0]
-            if self.video_path != '':
-                self.video_cap = cv2.VideoCapture(self.video_path)
-            if self.video_cap is None:
+    def is_valid(self, min_size: int = 8) -> bool:
+        x1, y1, x2, y2 = self.as_xyxy()
+        return (x2 - x1) >= min_size and (y2 - y1) >= min_size
+
+
+class LosslessCutLikeGUI:
+    SUPPORTED_VIDEO = {".mp4", ".flv", ".wmv", ".avi", ".mov", ".mkv", ".webm", ".m4v"}
+    SUPPORTED_IMAGE = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff"}
+
+    def __init__(self) -> None:
+        self.root = tk.Tk()
+        self.root.title(f"Video Subtitle Remover v{backend.main.config.VERSION} - Pink Studio")
+        self.root.geometry("1380x860")
+        self.root.minsize(1120, 760)
+
+        self._apply_theme()
+
+        self.media_path: Optional[MediaPath] = None
+        self.media_cap: Optional[cv2.VideoCapture] = None
+        self.current_frame: Optional[cv2.typing.MatLike] = None
+        self.preview_frame: Optional[cv2.typing.MatLike] = None
+        self.is_image: bool = False
+
+        self.frame_count: int = 1
+        self.fps: float = 25.0
+        self.frame_w: int = 0
+        self.frame_h: int = 0
+        self.current_frame_no: int = 1
+
+        self.preview_w = 960
+        self.preview_h = 540
+        self.scale: float = 1.0
+        self.offset_x: int = 0
+        self.offset_y: int = 0
+
+        self.selection_boxes: List[SelectionBox] = []
+        self.selected_box_index: Optional[int] = None
+        self.draft_start: Optional[Tuple[int, int]] = None
+        self.draft_canvas_id: Optional[int] = None
+        self.shape_var = tk.StringVar(value="rect")
+
+        self.b_mark_points: List[int] = []
+        self.segment_checks: List[tk.BooleanVar] = []
+        self.timeline_segment_ids: List[Tuple[Tuple[int, int], int]] = []
+
+        self.is_playing = False
+        self.last_image_token = None
+
+        self.worker: Optional[threading.Thread] = None
+        self.log_queue: "queue.Queue[str]" = queue.Queue()
+        self.active_sr: Optional["backend.main.SubtitleRemover"] = None
+        self.active_progress_base: float = 0.0
+        self.active_progress_span: float = 0.0
+
+        self._build_layout()
+        self._bind_events()
+        self._poll_logs()
+
+    def _apply_theme(self) -> None:
+        self.root.configure(bg="#FFF2F7")
+        style = ttk.Style(self.root)
+        style.theme_use("clam")
+
+        style.configure("Root.TFrame", background="#FFF2F7")
+        style.configure("Card.TFrame", background="#FFE4EF", borderwidth=1, relief="solid")
+        style.configure("Pink.TButton", background="#F06292", foreground="#ffffff", padding=(12, 7))
+        style.map("Pink.TButton", background=[("active", "#EC407A")])
+        style.configure("Ghost.TButton", background="#F8BBD0", foreground="#5C2843", padding=(10, 6))
+        style.map("Ghost.TButton", background=[("active", "#F48FB1")])
+        style.configure("TLabel", background="#FFF2F7", foreground="#4A1D35")
+        style.configure("Muted.TLabel", background="#FFE4EF", foreground="#6A3550")
+        style.configure("TCheckbutton", background="#FFE4EF", foreground="#4A1D35")
+        style.configure("Header.TLabel", font=("Microsoft YaHei UI", 12, "bold"), background="#FFF2F7")
+        style.configure("Small.TLabel", font=("Microsoft YaHei UI", 9), background="#FFE4EF", foreground="#6A3550")
+
+    def _build_layout(self) -> None:
+        root_frame = ttk.Frame(self.root, style="Root.TFrame", padding=10)
+        root_frame.pack(fill=tk.BOTH, expand=True)
+
+        left = ttk.Frame(root_frame, style="Card.TFrame", padding=10)
+        left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        right = ttk.Frame(root_frame, style="Card.TFrame", padding=10, width=350)
+        right.pack(side=tk.RIGHT, fill=tk.Y)
+        right.pack_propagate(False)
+
+        toolbar = ttk.Frame(left, style="Card.TFrame")
+        toolbar.pack(fill=tk.X, pady=(0, 8))
+
+        ttk.Button(toolbar, text="打开媒体", style="Pink.TButton", command=self.open_media).pack(side=tk.LEFT, padx=(0, 6))
+        ttk.Button(toolbar, text="播放/暂停", style="Ghost.TButton", command=self.toggle_play).pack(side=tk.LEFT, padx=6)
+        ttk.Button(toolbar, text="B 标记", style="Ghost.TButton", command=self.add_b_mark).pack(side=tk.LEFT, padx=6)
+        ttk.Button(toolbar, text="清空标记", style="Ghost.TButton", command=self.clear_b_marks).pack(side=tk.LEFT, padx=6)
+
+        self.media_info_var = tk.StringVar(value="未加载媒体")
+        ttk.Label(toolbar, textvariable=self.media_info_var, style="Small.TLabel").pack(side=tk.RIGHT)
+
+        self.canvas = tk.Canvas(left, bg="#1F1020", highlightthickness=1, highlightbackground="#F8BBD0")
+        self.canvas.pack(fill=tk.BOTH, expand=True)
+
+        timeline = ttk.Frame(left, style="Card.TFrame", padding=(0, 8, 0, 0))
+        timeline.pack(fill=tk.X)
+
+        self.frame_slider = tk.Scale(
+            timeline,
+            from_=1,
+            to=1,
+            orient=tk.HORIZONTAL,
+            showvalue=False,
+            bg="#FFE4EF",
+            highlightthickness=0,
+            troughcolor="#F48FB1",
+            activebackground="#F06292",
+            command=self.on_slider_change,
+        )
+        self.frame_slider.pack(fill=tk.X, padx=6)
+
+        self.timeline_canvas = tk.Canvas(
+            timeline,
+            height=42,
+            bg="#FFF4F8",
+            highlightthickness=1,
+            highlightbackground="#F8BBD0",
+        )
+        self.timeline_canvas.pack(fill=tk.X, padx=6, pady=(6, 2))
+
+        self.frame_text_var = tk.StringVar(value="Frame 1 / 1")
+        ttk.Label(timeline, textvariable=self.frame_text_var).pack(anchor=tk.W, padx=8, pady=(2, 4))
+
+        # Right panel
+        ttk.Label(right, text="选择框工具", style="Header.TLabel").pack(anchor=tk.W)
+
+        tools = ttk.Frame(right, style="Card.TFrame")
+        tools.pack(fill=tk.X, pady=(6, 10))
+        for shape, name in [("rect", "矩形"), ("round", "圆角矩形"), ("ellipse", "椭圆")]:
+            ttk.Radiobutton(tools, text=name, value=shape, variable=self.shape_var).pack(side=tk.LEFT, padx=8, pady=6)
+
+        box_btn_row = ttk.Frame(right, style="Card.TFrame")
+        box_btn_row.pack(fill=tk.X, pady=(0, 8))
+        ttk.Button(box_btn_row, text="删除选中框", style="Ghost.TButton", command=self.delete_selected_box).pack(side=tk.LEFT, padx=(0, 6))
+        ttk.Button(box_btn_row, text="清空全部框", style="Ghost.TButton", command=self.clear_boxes).pack(side=tk.LEFT)
+
+        ttk.Label(right, text="B 标记生成区间（两两配对）", style="Header.TLabel").pack(anchor=tk.W, pady=(4, 0))
+
+        self.segment_box = ttk.Frame(right, style="Card.TFrame")
+        self.segment_box.pack(fill=tk.BOTH, expand=True, pady=(6, 10))
+
+        action_box = ttk.Frame(right, style="Card.TFrame")
+        action_box.pack(fill=tk.X)
+
+        ttk.Button(action_box, text="导出剪辑（仅 Cut）", style="Pink.TButton", command=self.export_cut_only).pack(fill=tk.X, pady=(0, 8))
+        ttk.Button(action_box, text="去字幕并导出", style="Pink.TButton", command=self.process_and_export).pack(fill=tk.X, pady=(0, 8))
+
+        self.progress_var = tk.DoubleVar(value=0.0)
+        self.progress = ttk.Progressbar(action_box, maximum=100.0, variable=self.progress_var)
+        self.progress.pack(fill=tk.X, pady=(0, 8))
+
+        self.log_text = tk.Text(action_box, height=11, wrap=tk.WORD, bg="#FFF8FB", fg="#4A1D35")
+        self.log_text.pack(fill=tk.BOTH, expand=True)
+
+    def _bind_events(self) -> None:
+        self.root.bind("<KeyPress-b>", lambda _e: self.add_b_mark())
+        self.root.bind("<KeyPress-Delete>", lambda _e: self.delete_selected_box())
+        self.root.bind("<Configure>", lambda _e: self.refresh_preview())
+
+        self.canvas.bind("<ButtonPress-1>", self._on_canvas_down)
+        self.canvas.bind("<B1-Motion>", self._on_canvas_drag)
+        self.canvas.bind("<ButtonRelease-1>", self._on_canvas_up)
+        self.timeline_canvas.bind("<Button-1>", self._on_timeline_click)
+
+    def run(self) -> None:
+        self.root.mainloop()
+
+    # -------------------- Media --------------------
+    def open_media(self) -> None:
+        file_path = filedialog.askopenfilename(
+            title="打开视频或图片",
+            filetypes=[
+                ("Media", "*.mp4 *.flv *.wmv *.avi *.mov *.mkv *.webm *.m4v *.jpg *.jpeg *.png *.bmp *.webp *.tiff"),
+                ("All", "*.*"),
+            ],
+        )
+        if not file_path:
+            return
+
+        self.release_media()
+        self.media_path = file_path
+        ext = Path(file_path).suffix.lower()
+        self.is_image = ext in self.SUPPORTED_IMAGE
+        self.selection_boxes = []
+        self.selected_box_index = None
+        self.b_mark_points = []
+        self.refresh_segment_list()
+
+        if self.is_image:
+            image = self.read_image(file_path)
+            if image is None:
+                messagebox.showerror("打开失败", "图片读取失败")
                 return
-            if self.video_cap.isOpened():
-                ret, frame = self.video_cap.read()
-                if ret:
-                    for video in self.video_paths:
-                        print(f"Open Video Success：{video}")
-                    # 获取视频的帧数
-                    self.frame_count = self.video_cap.get(cv2.CAP_PROP_FRAME_COUNT)
-                    # 获取视频的高度
-                    self.frame_height = self.video_cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-                    # 获取视频的宽度
-                    self.frame_width = self.video_cap.get(cv2.CAP_PROP_FRAME_WIDTH)
-                    # 获取视频的帧率
-                    self.fps = self.video_cap.get(cv2.CAP_PROP_FPS)
-                    # 调整视频帧大小，使播放器能够显示
-                    resized_frame = self._img_resize(frame)
-                    # resized_frame = cv2.resize(src=frame, dsize=(self.video_preview_width, self.video_preview_height))
-                    # 显示视频帧
-                    self.window['-DISPLAY-'].update(data=cv2.imencode('.png', resized_frame)[1].tobytes())
-                    # 更新视频进度条滑块range
-                    self.window['-SLIDER-'].update(range=(1, self.frame_count))
-                    self.window['-SLIDER-'].update(1)
-                    # 预设字幕区域位置
-                    y_p, h_p, x_p, w_p = self.parse_subtitle_config()
-                    y = self.frame_height * y_p
-                    h = self.frame_height * h_p
-                    x = self.frame_width * x_p
-                    w = self.frame_width * w_p
-                    # 更新视频字幕位置滑块range
-                    # 更新Y-SLIDER范围
-                    self.window['-Y-SLIDER-'].update(range=(0, self.frame_height), disabled=False)
-                    # 更新Y-SLIDER默认值
-                    self.window['-Y-SLIDER-'].update(y)
-                    # 更新X-SLIDER范围
-                    self.window['-X-SLIDER-'].update(range=(0, self.frame_width), disabled=False)
-                    # 更新X-SLIDER默认值
-                    self.window['-X-SLIDER-'].update(x)
-                    # 更新Y-SLIDER-H范围
-                    self.window['-Y-SLIDER-H-'].update(range=(0, self.frame_height - y))
-                    # 更新Y-SLIDER-H默认值
-                    self.window['-Y-SLIDER-H-'].update(h)
-                    # 更新X-SLIDER-W范围
-                    self.window['-X-SLIDER-W-'].update(range=(0, self.frame_width - x))
-                    # 更新X-SLIDER-W默认值
-                    self.window['-X-SLIDER-W-'].update(w)
-                    self._update_preview(frame, (y, h, x, w))
-
-    def __disable_button(self):
-        # 1) 禁止修改字幕滑块区域
-        self.window['-Y-SLIDER-'].update(disabled=True)
-        self.window['-X-SLIDER-'].update(disabled=True)
-        self.window['-Y-SLIDER-H-'].update(disabled=True)
-        self.window['-X-SLIDER-W-'].update(disabled=True)
-        # 2) 禁止再次点击【运行】、【打开】和【识别语言】按钮
-        self.window['-RUN-'].update(disabled=True)
-        self.window['-FILE-'].update(disabled=True)
-        self.window['-FILE_BTN-'].update(disabled=True)
-
-    def _run_event_handler(self, event, values):
-        """
-        当点击运行按钮时：
-        1) 禁止修改字幕滑块区域
-        2) 禁止再次点击【运行】和【打开】按钮
-        3) 设定字幕区域位置
-        """
-        if event == '-RUN-':
-            if self.video_cap is None:
-                print('Please Open Video First')
-            else:
-                # 禁用按钮
-                self.__disable_button()
-                # 3) 设定字幕区域位置
-                self.xmin = int(values['-X-SLIDER-'])
-                self.xmax = int(values['-X-SLIDER-'] + values['-X-SLIDER-W-'])
-                self.ymin = int(values['-Y-SLIDER-'])
-                self.ymax = int(values['-Y-SLIDER-'] + values['-Y-SLIDER-H-'])
-                if self.ymax > self.frame_height:
-                    self.ymax = self.frame_height
-                if self.xmax > self.frame_width:
-                    self.xmax = self.frame_width
-                if len(self.video_paths) <= 1:
-                    subtitle_area = (self.ymin, self.ymax, self.xmin, self.xmax)
-                else:
-                    print(f"{'Processing multiple videos or images'}")
-                    # 先判断每个视频的分辨率是否一致，一致的话设置相同的字幕区域，否则设置为None
-                    global_size = None
-                    for temp_video_path in self.video_paths:
-                        temp_cap = cv2.VideoCapture(temp_video_path)
-                        if global_size is None:
-                            global_size = (int(temp_cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(temp_cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-                        else:
-                            temp_size = (int(temp_cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(temp_cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-                            if temp_size != global_size:
-                                print('not all video/images in same size, processing in full screen')
-                                subtitle_area = None
-                    else:
-                        subtitle_area = (self.ymin, self.ymax, self.xmin, self.xmax)
-                y_p = self.ymin / self.frame_height
-                h_p = (self.ymax - self.ymin) / self.frame_height
-                x_p = self.xmin / self.frame_width
-                w_p = (self.xmax - self.xmin) / self.frame_width
-                self.set_subtitle_config(y_p, h_p, x_p, w_p)
-
-                def task():
-                    while self.video_paths:
-                        video_path = self.video_paths.pop()
-                        if subtitle_area is not None:
-                            print(f"{'SubtitleArea'}：({self.ymin},{self.ymax},{self.xmin},{self.xmax})")
-                        self.sr = backend.main.SubtitleRemover(video_path, subtitle_area, True)
-                        self.__disable_button()
-                        self.sr.run()
-                Thread(target=task, daemon=True).start()
-                self.video_cap.release()
-                self.video_cap = None
-
-    def _slide_event_handler(self, event, values):
-        """
-        当滑动视频进度条/滑动字幕选择区域滑块时：
-        1) 判断视频是否存在，如果存在则显示对应的视频帧
-        2) 绘制rectangle
-        """
-        if event == '-SLIDER-' or event == '-Y-SLIDER-' or event == '-Y-SLIDER-H-' or event == '-X-SLIDER-' or event \
-                == '-X-SLIDER-W-':
-            # 判断是否时单张图片
-            if is_image_file(self.video_path):
-                img = cv2.imread(self.video_path)
-                self.window['-Y-SLIDER-H-'].update(range=(0, self.frame_height - values['-Y-SLIDER-']))
-                self.window['-X-SLIDER-W-'].update(range=(0, self.frame_width - values['-X-SLIDER-']))
-                # 画字幕框
-                y = int(values['-Y-SLIDER-'])
-                h = int(values['-Y-SLIDER-H-'])
-                x = int(values['-X-SLIDER-'])
-                w = int(values['-X-SLIDER-W-'])
-                self._update_preview(img, (y, h, x, w))
-            elif self.video_cap is not None and self.video_cap.isOpened():
-                frame_no = int(values['-SLIDER-'])
-                self.video_cap.set(cv2.CAP_PROP_POS_FRAMES, frame_no)
-                ret, frame = self.video_cap.read()
-                if ret:
-                    self.window['-Y-SLIDER-H-'].update(range=(0, self.frame_height-values['-Y-SLIDER-']))
-                    self.window['-X-SLIDER-W-'].update(range=(0, self.frame_width-values['-X-SLIDER-']))
-                    # 画字幕框
-                    y = int(values['-Y-SLIDER-'])
-                    h = int(values['-Y-SLIDER-H-'])
-                    x = int(values['-X-SLIDER-'])
-                    w = int(values['-X-SLIDER-W-'])
-                    self._update_preview(frame, (y, h, x, w))
-
-    def _update_preview(self, frame, y_h_x_w):
-        y, h, x, w = y_h_x_w
-        # 画字幕框
-        draw = cv2.rectangle(img=frame, pt1=(int(x), int(y)), pt2=(int(x) + int(w), int(y) + int(h)),
-                             color=(0, 255, 0), thickness=3)
-        # 调整视频帧大小，使播放器能够显示
-        resized_frame = self._img_resize(draw)
-        # 显示视频帧
-        self.window['-DISPLAY-'].update(data=cv2.imencode('.png', resized_frame)[1].tobytes())
-
-    def _img_resize(self, image):
-        top, bottom, left, right = (0, 0, 0, 0)
-        height, width = image.shape[0], image.shape[1]
-        # 对长短不想等的图片，找到最长的一边
-        longest_edge = height
-        # 计算短边需要增加多少像素宽度使其与长边等长
-        if width < longest_edge:
-            dw = longest_edge - width
-            left = dw // 2
-            right = dw - left
+            self.current_frame = image
+            self.frame_h, self.frame_w = image.shape[:2]
+            self.frame_count, self.fps, self.current_frame_no = 1, 1.0, 1
+            self.frame_slider.configure(to=1)
+            self.frame_slider.set(1)
         else:
-            pass
-        # 给图像增加边界
-        constant = cv2.copyMakeBorder(image, top, bottom, left, right, cv2.BORDER_CONSTANT, value=[0, 0, 0])
-        return cv2.resize(constant, (self.video_preview_width, self.video_preview_height))
+            cap = cv2.VideoCapture(file_path)
+            if not cap.isOpened():
+                messagebox.showerror("打开失败", "视频读取失败")
+                return
+            self.media_cap = cap
+            self.frame_count = max(1, int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 1))
+            self.fps = float(cap.get(cv2.CAP_PROP_FPS) or 25.0)
+            self.frame_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+            self.frame_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+            self.current_frame_no = 1
+            self.frame_slider.configure(to=self.frame_count)
+            self.frame_slider.set(1)
+            self.seek_frame(1)
 
-    def set_subtitle_config(self, y, h, x, w):
-        # 写入配置文件
-        with open(self.subtitle_config_file, mode='w', encoding='utf-8') as f:
-            f.write('[AREA]\n')
-            f.write(f'Y = {y}\n')
-            f.write(f'H = {h}\n')
-            f.write(f'X = {x}\n')
-            f.write(f'W = {w}\n')
+        self.media_info_var.set(f"{Path(file_path).name} | {self.frame_w}x{self.frame_h}")
+        self.refresh_preview()
+        self.refresh_timeline()
 
-    def parse_subtitle_config(self):
-        y_p, h_p, x_p, w_p = .78, .21, .05, .9
-        # 如果配置文件不存在，则写入配置文件
-        if not os.path.exists(self.subtitle_config_file):
-            self.set_subtitle_config(y_p, h_p, x_p, w_p)
-            return y_p, h_p, x_p, w_p
+    def release_media(self) -> None:
+        self.is_playing = False
+        if self.media_cap is not None:
+            self.media_cap.release()
+            self.media_cap = None
+
+    def seek_frame(self, frame_no: int) -> None:
+        if self.is_image or self.media_cap is None:
+            return
+        frame_no = max(1, min(self.frame_count, int(frame_no)))
+        self.media_cap.set(cv2.CAP_PROP_POS_FRAMES, frame_no - 1)
+        ok, frame = self.media_cap.read()
+        if ok:
+            self.current_frame = frame
+            self.current_frame_no = frame_no
+            self.frame_text_var.set(f"Frame {self.current_frame_no} / {self.frame_count}")
+            self.refresh_preview()
+            self.refresh_timeline()
+
+    def on_slider_change(self, value: str) -> None:
+        if self.worker and self.worker.is_alive():
+            return
+        if self.is_image:
+            self.current_frame_no = 1
+            self.frame_text_var.set("Image Mode")
+            return
+        self.seek_frame(int(float(value)))
+
+    def toggle_play(self) -> None:
+        if self.is_image or self.media_cap is None:
+            return
+        self.is_playing = not self.is_playing
+        if self.is_playing:
+            self._play_loop()
+
+    def _play_loop(self) -> None:
+        if not self.is_playing or self.media_cap is None:
+            return
+        ok, frame = self.media_cap.read()
+        if not ok:
+            self.is_playing = False
+            return
+        self.current_frame = frame
+        self.current_frame_no = min(self.frame_count, self.current_frame_no + 1)
+        self.frame_slider.set(self.current_frame_no)
+        self.frame_text_var.set(f"Frame {self.current_frame_no} / {self.frame_count}")
+        self.refresh_preview()
+        self.refresh_timeline()
+        delay = max(10, int(1000 / max(self.fps, 1.0)))
+        self.root.after(delay, self._play_loop)
+
+    # -------------------- Drawing --------------------
+    def _on_canvas_down(self, event: tk.Event) -> None:
+        if self.current_frame is None:
+            return
+        hit_idx = self._hit_test(event.x, event.y)
+        if hit_idx is not None:
+            self.selected_box_index = hit_idx
+            self.refresh_preview()
+            return
+        ix, iy = self._canvas_to_image(event.x, event.y)
+        if ix is None or iy is None:
+            return
+        self.draft_start = (ix, iy)
+
+    def _on_canvas_drag(self, event: tk.Event) -> None:
+        if self.current_frame is None or self.draft_start is None:
+            return
+        ix, iy = self._canvas_to_image(event.x, event.y)
+        if ix is None or iy is None:
+            return
+        self.refresh_preview()
+        sx, sy = self.draft_start
+        cx1, cy1 = self._image_to_canvas(sx, sy)
+        cx2, cy2 = self._image_to_canvas(ix, iy)
+        color = "#FF4D8D"
+        if self.shape_var.get() == "ellipse":
+            self.draft_canvas_id = self.canvas.create_oval(cx1, cy1, cx2, cy2, outline=color, width=2, dash=(4, 2))
         else:
+            self.draft_canvas_id = self.canvas.create_rectangle(cx1, cy1, cx2, cy2, outline=color, width=2, dash=(4, 2))
+
+    def _on_canvas_up(self, event: tk.Event) -> None:
+        if self.current_frame is None or self.draft_start is None:
+            return
+        ix, iy = self._canvas_to_image(event.x, event.y)
+        if ix is None or iy is None:
+            self.draft_start = None
+            return
+        sx, sy = self.draft_start
+        box = SelectionBox(sx, sy, ix, iy, self.shape_var.get())
+        if box.is_valid():
+            self.selection_boxes.append(box.normalized())
+            self.selected_box_index = len(self.selection_boxes) - 1
+        self.draft_start = None
+        self.draft_canvas_id = None
+        self.refresh_preview()
+
+    def _hit_test(self, cx: int, cy: int) -> Optional[int]:
+        for i in range(len(self.selection_boxes) - 1, -1, -1):
+            box = self.selection_boxes[i]
+            x1, y1, x2, y2 = box.as_xyxy()
+            c1x, c1y = self._image_to_canvas(x1, y1)
+            c2x, c2y = self._image_to_canvas(x2, y2)
+            if c1x <= cx <= c2x and c1y <= cy <= c2y:
+                return i
+        return None
+
+    def delete_selected_box(self) -> None:
+        if self.selected_box_index is None:
+            return
+        if 0 <= self.selected_box_index < len(self.selection_boxes):
+            self.selection_boxes.pop(self.selected_box_index)
+        self.selected_box_index = None
+        self.refresh_preview()
+
+    def clear_boxes(self) -> None:
+        self.selection_boxes = []
+        self.selected_box_index = None
+        self.refresh_preview()
+
+    # -------------------- B marks / segments --------------------
+    def add_b_mark(self) -> None:
+        if self.media_path is None:
+            return
+        point = 1 if self.is_image else self.current_frame_no
+        if point not in self.b_mark_points:
+            self.b_mark_points.append(point)
+            self.b_mark_points.sort()
+            self.refresh_segment_list()
+            self.log(f"B 标记: frame={point}")
+
+    def clear_b_marks(self) -> None:
+        self.b_mark_points = []
+        self.refresh_segment_list()
+
+    def get_segments(self) -> List[Tuple[int, int]]:
+        points = sorted(self.b_mark_points)
+        pairs: List[Tuple[int, int]] = []
+        for i in range(0, len(points) - 1, 2):
+            a, b = points[i], points[i + 1]
+            pairs.append((min(a, b), max(a, b)))
+        return pairs
+
+    def refresh_segment_list(self) -> None:
+        for child in self.segment_box.winfo_children():
+            child.destroy()
+        self.segment_checks = []
+        segments = self.get_segments()
+        if not segments:
+            ttk.Label(self.segment_box, text="暂无区间。按 B 键打点，两两成段。", style="Small.TLabel").pack(anchor=tk.W, padx=8, pady=8)
+            self.refresh_timeline()
+            return
+
+        for idx, (start_f, end_f) in enumerate(segments, start=1):
+            var = tk.BooleanVar(value=True)
+            self.segment_checks.append(var)
+            text = f"段 {idx}: {self._frame_to_time(start_f)} - {self._frame_to_time(end_f)} (f{start_f}-{end_f})"
+            ttk.Checkbutton(self.segment_box, text=text, variable=var, command=self.refresh_timeline).pack(anchor=tk.W, padx=6, pady=2)
+        self.refresh_timeline()
+
+    def selected_segments(self) -> List[Tuple[int, int]]:
+        all_segments = self.get_segments()
+        if not all_segments:
+            if self.is_image:
+                return [(1, 1)]
+            return [(1, self.frame_count)]
+        selected: List[Tuple[int, int]] = []
+        for seg, flag in zip(all_segments, self.segment_checks):
+            if flag.get():
+                selected.append(seg)
+        return selected if selected else all_segments
+
+    # -------------------- Export / process --------------------
+    def export_cut_only(self) -> None:
+        if not self.media_path or self.is_image:
+            messagebox.showinfo("提示", "仅视频支持 Cut 导出。")
+            return
+        out_path = filedialog.asksaveasfilename(
+            title="导出剪辑",
+            defaultextension=".mp4",
+            filetypes=[("MP4", "*.mp4")],
+            initialfile=f"{Path(self.media_path).stem}_cut.mp4",
+        )
+        if not out_path:
+            return
+        segments = self.selected_segments()
+
+        def task() -> None:
             try:
-                config = configparser.ConfigParser()
-                config.read(self.subtitle_config_file, encoding='utf-8')
-                conf_y_p, conf_h_p, conf_x_p, conf_w_p = float(config['AREA']['Y']), float(config['AREA']['H']), float(config['AREA']['X']), float(config['AREA']['W'])
-                return conf_y_p, conf_h_p, conf_x_p, conf_w_p
-            except Exception:
-                self.set_subtitle_config(y_p, h_p, x_p, w_p)
-                return y_p, h_p, x_p, w_p
+                self.log("开始导出剪辑...")
+                self.progress_var.set(5)
+                self.export_segments_with_ffmpeg(self.media_path, segments, out_path)
+                self.progress_var.set(100)
+                self.log(f"导出完成: {out_path}")
+            except Exception as exc:
+                self.log(f"导出失败: {exc}")
 
+        self.start_worker(task)
 
-if __name__ == '__main__':
-    try:
-        multiprocessing.set_start_method("spawn")
-        # 运行图形化界面
-        subtitleRemoverGUI = SubtitleRemoverGUI()
-        subtitleRemoverGUI.run()
-    except Exception as e:
-        print(f'[{type(e)}] {e}')
-        import traceback
-        traceback.print_exc()
-        msg = traceback.format_exc()
-        err_log_path = os.path.join(os.path.expanduser('~'), 'VSR-Error-Message.log')
-        with open(err_log_path, 'w', encoding='utf-8') as f:
-            f.writelines(msg)
-        import platform
-        if platform.system() == 'Windows':
-            os.system('pause')
+    def process_and_export(self) -> None:
+        if not self.media_path:
+            return
+        suffix = ".png" if self.is_image else ".mp4"
+        out_path = filedialog.asksaveasfilename(
+            title="导出处理结果",
+            defaultextension=suffix,
+            filetypes=[("Media", f"*{suffix}")],
+            initialfile=f"{Path(self.media_path).stem}_processed{suffix}",
+        )
+        if not out_path:
+            return
+
+        segments = self.selected_segments()
+
+        def task() -> None:
+            temp_input = None
+            pipeline_temp_paths: List[str] = []
+            try:
+                self.log("开始处理...")
+                self.progress_var.set(1)
+                boxes = [b.normalized() for b in self.selection_boxes if b.is_valid()]
+
+                if self.is_image:
+                    if boxes:
+                        self.log(f"图片多框逐框处理: {len(boxes)} 个选择框")
+                        self.process_image_with_boxes(self.media_path, boxes, out_path)
+                        self.progress_var.set(100)
+                        self.log(f"处理完成: {out_path}")
+                        return
+                    self.log("图片未选择框，使用后端自动检测处理")
+                    self.active_progress_base = 10.0
+                    self.active_progress_span = 85.0
+                    sr = backend.main.SubtitleRemover(self.media_path, None, True)
+                    self.active_sr = sr
+                    sr.run()
+                    self.active_sr = None
+                    generated = sr.video_out_name
+                    if not os.path.exists(generated):
+                        raise RuntimeError("未找到输出文件")
+                    os.replace(generated, out_path)
+                    self.progress_var.set(100)
+                    self.log(f"处理完成: {out_path}")
+                    return
+
+                # video mode
+                if not self.is_image:
+                    temp_input = self.media_path
+                    if segments != [(1, self.frame_count)]:
+                        self.log("按选中区间裁剪输入视频...")
+                        self.progress_var.set(8)
+                        cut_temp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+                        cut_temp.close()
+                        self.export_segments_with_ffmpeg(self.media_path, segments, cut_temp.name)
+                        temp_input = cut_temp.name
+                        pipeline_temp_paths.append(cut_temp.name)
+
+                if not boxes:
+                    boxes = [SelectionBox(0, 0, self.frame_w, self.frame_h, "rect")]
+                    self.log("未选择框，将按全画面处理")
+                else:
+                    self.log(f"视频多框逐框处理: {len(boxes)} 个选择框")
+
+                current_input = temp_input
+                total = len(boxes)
+                for idx, box in enumerate(boxes, start=1):
+                    area = self.box_to_backend_area(box)
+                    self.log(f"处理框 {idx}/{total}: {area}")
+                    self.active_progress_base = 12.0 + (idx - 1) * (84.0 / total)
+                    self.active_progress_span = 84.0 / total
+                    sr = backend.main.SubtitleRemover(current_input, area, True)
+                    self.active_sr = sr
+                    sr.run()
+                    self.active_sr = None
+
+                    generated = sr.video_out_name
+                    if not os.path.exists(generated):
+                        raise RuntimeError(f"第 {idx} 个框处理后未找到输出文件")
+
+                    if idx < total:
+                        next_temp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+                        next_temp.close()
+                        pipeline_temp_paths.append(next_temp.name)
+                        os.replace(generated, next_temp.name)
+                        if current_input != self.media_path and os.path.exists(current_input):
+                            try:
+                                os.remove(current_input)
+                            except Exception:
+                                pass
+                        current_input = next_temp.name
+                    else:
+                        os.replace(generated, out_path)
+                self.progress_var.set(100)
+                self.log(f"处理完成: {out_path}")
+            except Exception as exc:
+                self.active_sr = None
+                self.log(f"处理失败: {exc}")
+            finally:
+                if temp_input and temp_input != self.media_path and os.path.exists(temp_input):
+                    try:
+                        os.remove(temp_input)
+                    except Exception:
+                        pass
+                for p in pipeline_temp_paths:
+                    if os.path.exists(p):
+                        try:
+                            os.remove(p)
+                        except Exception:
+                            pass
+
+        self.start_worker(task)
+
+    @staticmethod
+    def _frame_to_sec(frame_no: int, fps: float) -> float:
+        return max(0.0, (frame_no - 1) / max(1.0, fps))
+
+    def _frame_to_time(self, frame_no: int) -> str:
+        s = self._frame_to_sec(frame_no, self.fps)
+        hh = int(s // 3600)
+        mm = int((s % 3600) // 60)
+        ss = s % 60
+        return f"{hh:02d}:{mm:02d}:{ss:06.3f}"
+
+    def export_segments_with_ffmpeg(self, input_path: str, segments: Sequence[Tuple[int, int]], output_path: str) -> None:
+        ffmpeg = backend_config.FFMPEG_PATH
+        if not ffmpeg or not os.path.exists(ffmpeg):
+            raise RuntimeError("FFmpeg 不可用，请检查 backend/config.py 中的 FFMPEG_PATH")
+        if not segments:
+            raise RuntimeError("没有可导出的区间")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            part_files = []
+            for idx, (start_f, end_f) in enumerate(segments, start=1):
+                part = os.path.join(tmp, f"part_{idx:03d}.mp4")
+                start = self._frame_to_sec(start_f, self.fps)
+                end = self._frame_to_sec(end_f + 1, self.fps)
+                cmd = [
+                    ffmpeg,
+                    "-y",
+                    "-ss",
+                    f"{start:.6f}",
+                    "-to",
+                    f"{end:.6f}",
+                    "-i",
+                    input_path,
+                    "-c",
+                    "copy",
+                    "-avoid_negative_ts",
+                    "1",
+                    part,
+                ]
+                self.run_cmd(cmd)
+                part_files.append(part)
+
+            concat_list = os.path.join(tmp, "list.txt")
+            with open(concat_list, "w", encoding="utf-8") as f:
+                for p in part_files:
+                    p2 = p.replace("\\", "/").replace("'", "'\\''")
+                    f.write(f"file '{p2}'\n")
+
+            concat_cmd = [ffmpeg, "-y", "-f", "concat", "-safe", "0", "-i", concat_list, "-c", "copy", output_path]
+            self.run_cmd(concat_cmd)
+
+    def process_image_with_boxes(self, input_path: str, boxes: Sequence[SelectionBox], output_path: str) -> None:
+        image = self.read_image(input_path)
+        if image is None:
+            raise RuntimeError("图片读取失败")
+        h, w = image.shape[:2]
+        result = image.copy()
+        total = max(1, len(boxes))
+        for idx, box in enumerate(boxes, start=1):
+            mask = self.build_shape_mask((h, w), box)
+            result = cv2.inpaint(result, mask, 3, cv2.INPAINT_TELEA)
+            self.progress_var.set(8 + 88 * idx / total)
+        self.write_image(output_path, result)
+
+    def build_shape_mask(self, hw: Tuple[int, int], box: SelectionBox):
+        import numpy as np
+
+        h, w = hw
+        mask = np.zeros((h, w), dtype=np.uint8)
+        x1, y1, x2, y2 = box.as_xyxy()
+        x1 = max(0, min(w - 1, x1))
+        x2 = max(0, min(w - 1, x2))
+        y1 = max(0, min(h - 1, y1))
+        y2 = max(0, min(h - 1, y2))
+        if box.shape == "ellipse":
+            cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+            ax, ay = max(1, (x2 - x1) // 2), max(1, (y2 - y1) // 2)
+            cv2.ellipse(mask, (cx, cy), (ax, ay), 0, 0, 360, 255, -1)
+        elif box.shape == "round":
+            radius = max(4, min(x2 - x1, y2 - y1) // 8)
+            cv2.rectangle(mask, (x1 + radius, y1), (x2 - radius, y2), 255, -1)
+            cv2.rectangle(mask, (x1, y1 + radius), (x2, y2 - radius), 255, -1)
+            cv2.circle(mask, (x1 + radius, y1 + radius), radius, 255, -1)
+            cv2.circle(mask, (x2 - radius, y1 + radius), radius, 255, -1)
+            cv2.circle(mask, (x1 + radius, y2 - radius), radius, 255, -1)
+            cv2.circle(mask, (x2 - radius, y2 - radius), radius, 255, -1)
         else:
-            input()
+            cv2.rectangle(mask, (x1, y1), (x2, y2), 255, -1)
+        return mask
+
+    def box_to_backend_area(self, box: SelectionBox) -> Tuple[int, int, int, int]:
+        x1, y1, x2, y2 = box.as_xyxy()
+        xmin = max(0, min(self.frame_w, x1))
+        xmax = max(0, min(self.frame_w, x2))
+        ymin = max(0, min(self.frame_h, y1))
+        ymax = max(0, min(self.frame_h, y2))
+        if xmax <= xmin:
+            xmax = min(self.frame_w, xmin + 1)
+        if ymax <= ymin:
+            ymax = min(self.frame_h, ymin + 1)
+        return ymin, ymax, xmin, xmax
+
+    def merged_area_for_backend(self) -> Optional[Tuple[int, int, int, int]]:
+        if not self.selection_boxes:
+            return None
+        xs1, ys1, xs2, ys2 = [], [], [], []
+        for box in self.selection_boxes:
+            x1, y1, x2, y2 = box.as_xyxy()
+            xs1.append(x1)
+            ys1.append(y1)
+            xs2.append(x2)
+            ys2.append(y2)
+        xmin = max(0, min(xs1))
+        ymin = max(0, min(ys1))
+        xmax = min(self.frame_w, max(xs2))
+        ymax = min(self.frame_h, max(ys2))
+        if xmax <= xmin or ymax <= ymin:
+            return None
+        self.log(f"多选框合并区域: ({ymin},{ymax},{xmin},{xmax})")
+        return (ymin, ymax, xmin, xmax)
+
+    @staticmethod
+    def run_cmd(cmd: Sequence[str]) -> None:
+        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=False)
+
+    @staticmethod
+    def read_image(path: str):
+        data = cv2.imread(path)
+        if data is not None:
+            return data
+        try:
+            import numpy as np
+
+            raw = np.fromfile(path, dtype=np.uint8)
+        except Exception:
+            return None
+        if raw is None or raw.size == 0:
+            return None
+        return cv2.imdecode(raw, cv2.IMREAD_COLOR)
+
+    @staticmethod
+    def write_image(path: str, image) -> None:
+        ext = Path(path).suffix or ".png"
+        ok, enc = cv2.imencode(ext, image)
+        if not ok:
+            raise RuntimeError("图片编码失败")
+        try:
+            enc.tofile(path)
+        except Exception as exc:
+            raise RuntimeError(f"图片保存失败: {exc}") from exc
+
+    # -------------------- Preview --------------------
+    def refresh_preview(self) -> None:
+        if self.current_frame is None:
+            return
+
+        canvas_w = max(300, self.canvas.winfo_width())
+        canvas_h = max(200, self.canvas.winfo_height())
+        h, w = self.current_frame.shape[:2]
+        if h <= 0 or w <= 0:
+            return
+
+        scale = min(canvas_w / w, canvas_h / h)
+        draw_w = max(1, int(w * scale))
+        draw_h = max(1, int(h * scale))
+        self.scale = scale
+        self.offset_x = (canvas_w - draw_w) // 2
+        self.offset_y = (canvas_h - draw_h) // 2
+
+        frame = cv2.resize(self.current_frame, (draw_w, draw_h), interpolation=cv2.INTER_AREA)
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        ok, png = cv2.imencode(".png", rgb)
+        if not ok:
+            return
+
+        img = tk.PhotoImage(data=png.tobytes())
+        self.last_image_token = img
+        self.canvas.delete("all")
+        self.canvas.create_image(self.offset_x, self.offset_y, anchor=tk.NW, image=img)
+
+        for idx, box in enumerate(self.selection_boxes):
+            self._draw_box(box, selected=(idx == self.selected_box_index))
+
+        if self.is_image:
+            self.frame_text_var.set("Image Mode")
+        else:
+            self.frame_text_var.set(f"Frame {self.current_frame_no} / {self.frame_count}")
+
+    def _draw_box(self, box: SelectionBox, selected: bool = False) -> None:
+        x1, y1, x2, y2 = box.as_xyxy()
+        cx1, cy1 = self._image_to_canvas(x1, y1)
+        cx2, cy2 = self._image_to_canvas(x2, y2)
+        outline = "#FF2D75" if selected else "#FF85AD"
+        fill = "#FFB3CC"
+
+        if box.shape == "ellipse":
+            self.canvas.create_oval(cx1, cy1, cx2, cy2, outline=outline, fill=fill, width=2)
+        elif box.shape == "round":
+            r = max(6, min(abs(cx2 - cx1), abs(cy2 - cy1)) // 8)
+            self._draw_round_rect(cx1, cy1, cx2, cy2, r, outline, fill)
+        else:
+            self.canvas.create_rectangle(cx1, cy1, cx2, cy2, outline=outline, fill=fill, width=2)
+
+    def _on_timeline_click(self, event: tk.Event) -> None:
+        if self.is_image or self.frame_count <= 1:
+            return
+        w = max(1, self.timeline_canvas.winfo_width())
+        x = max(12, min(w - 12, event.x))
+        frame = int(round(((x - 12) / max(1, (w - 24))) * (self.frame_count - 1))) + 1
+        self.frame_slider.set(frame)
+        self.seek_frame(frame)
+
+    def refresh_timeline(self) -> None:
+        if not hasattr(self, "timeline_canvas"):
+            return
+        c = self.timeline_canvas
+        c.delete("all")
+        w = max(200, c.winfo_width())
+        h = max(30, c.winfo_height())
+        y0, y1 = 10, h - 10
+        x0, x1 = 12, w - 12
+
+        c.create_rectangle(x0, y0, x1, y1, fill="#F8BBD0", outline="#F48FB1")
+        c.create_text(6, h // 2, text="I", fill="#A73867", anchor=tk.W, font=("Consolas", 9, "bold"))
+        c.create_text(w - 6, h // 2, text="O", fill="#A73867", anchor=tk.E, font=("Consolas", 9, "bold"))
+
+        def f2x(frame_no: int) -> int:
+            if self.frame_count <= 1:
+                return x0
+            ratio = (frame_no - 1) / (self.frame_count - 1)
+            return int(x0 + ratio * (x1 - x0))
+
+        self.timeline_segment_ids = []
+        segments = self.get_segments()
+        for idx, (seg, var) in enumerate(zip(segments, self.segment_checks), start=1):
+            s, e = seg
+            sx, ex = f2x(s), f2x(e)
+            fill = "#F06292" if var.get() else "#E2A5BE"
+            item = c.create_rectangle(sx, y0 + 2, max(sx + 2, ex), y1 - 2, fill=fill, outline="")
+            self.timeline_segment_ids.append((seg, item))
+            c.create_text((sx + ex) // 2, y0 - 1, text=str(idx), fill="#7A2E4F", anchor=tk.S, font=("Consolas", 8))
+
+        for p in self.b_mark_points:
+            px = f2x(p)
+            c.create_line(px, y0 - 3, px, y1 + 3, fill="#C2185B", width=2)
+
+        if not self.is_image:
+            hx = f2x(self.current_frame_no)
+            c.create_polygon(hx - 5, y0 - 5, hx + 5, y0 - 5, hx, y0 + 3, fill="#6A1B9A", outline="")
+            c.create_line(hx, y0, hx, y1, fill="#6A1B9A", width=1)
+
+    def _draw_round_rect(self, x1: int, y1: int, x2: int, y2: int, r: int, outline: str, fill: str) -> None:
+        x1, x2 = sorted([x1, x2])
+        y1, y2 = sorted([y1, y2])
+        points = [
+            x1 + r, y1,
+            x2 - r, y1,
+            x2, y1,
+            x2, y1 + r,
+            x2, y2 - r,
+            x2, y2,
+            x2 - r, y2,
+            x1 + r, y2,
+            x1, y2,
+            x1, y2 - r,
+            x1, y1 + r,
+            x1, y1,
+        ]
+        self.canvas.create_polygon(points, smooth=True, splinesteps=24, outline=outline, fill=fill, width=2)
+
+    def _canvas_to_image(self, cx: int, cy: int) -> Tuple[Optional[int], Optional[int]]:
+        ix = int((cx - self.offset_x) / max(self.scale, 1e-6))
+        iy = int((cy - self.offset_y) / max(self.scale, 1e-6))
+        if ix < 0 or iy < 0 or ix >= self.frame_w or iy >= self.frame_h:
+            return None, None
+        return ix, iy
+
+    def _image_to_canvas(self, ix: int, iy: int) -> Tuple[int, int]:
+        cx = int(ix * self.scale + self.offset_x)
+        cy = int(iy * self.scale + self.offset_y)
+        return cx, cy
+
+    # -------------------- Worker/log --------------------
+    def start_worker(self, fn) -> None:
+        if self.worker and self.worker.is_alive():
+            messagebox.showinfo("忙碌", "当前有任务正在执行")
+            return
+        self.worker = threading.Thread(target=fn, daemon=True)
+        self.worker.start()
+
+    def log(self, msg: str) -> None:
+        self.log_queue.put(msg)
+
+    def _poll_logs(self) -> None:
+        if self.active_sr is not None:
+            try:
+                p = max(0.0, min(100.0, float(self.active_sr.progress_total)))
+                self.progress_var.set(min(99.0, self.active_progress_base + p * self.active_progress_span / 100.0))
+                if self.active_sr.preview_frame is not None:
+                    self.current_frame = self.active_sr.preview_frame
+                    self.refresh_preview()
+            except Exception:
+                pass
+        while True:
+            try:
+                msg = self.log_queue.get_nowait()
+            except queue.Empty:
+                break
+            self.log_text.insert(tk.END, msg + "\n")
+            self.log_text.see(tk.END)
+        self.refresh_timeline()
+        self.root.after(120, self._poll_logs)
+
+
+if __name__ == "__main__":
+    app = LosslessCutLikeGUI()
+    app.run()
