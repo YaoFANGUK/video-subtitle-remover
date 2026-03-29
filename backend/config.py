@@ -20,7 +20,12 @@ try:
     USE_DML = True
 except:
     USE_DML = False
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    if torch.cuda.is_available():
+        device = torch.device("cuda:0")
+    elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LAMA_MODEL_PATH = os.path.join(BASE_DIR, 'models', 'big-lama')
 STTN_MODEL_PATH = os.path.join(BASE_DIR, 'models', 'sttn', 'infer_model.pth')
