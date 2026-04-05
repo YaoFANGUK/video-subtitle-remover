@@ -5,6 +5,7 @@
 ![License](https://img.shields.io/badge/License-Apache%202-red.svg)
 ![python version](https://img.shields.io/badge/Python-3.11+-blue.svg)
 ![support os](https://img.shields.io/badge/OS-Windows/macOS/Linux-green.svg)
+[![Docker](https://img.shields.io/badge/Docker-Image-blue?logo=docker)](https://hub.docker.com/r/eritpchy/video-subtitle-remover)
 
 Video-subtitle-remover (VSR) is an AI-based software that removes hardcoded subtitles from videos. It mainly implements the following functionalities:
 
@@ -14,7 +15,7 @@ Video-subtitle-remover (VSR) is an AI-based software that removes hardcoded subt
 - Supports automatic removal of all text throughout the entire video (without inputting a position).
 - Supports multi-selection of images for batch removal of watermark text.
 
-<p style="text-align:center;"><img src="https://github.com/YaoFANGUK/video-subtitle-remover/raw/main/design/demo.png" alt="demo.png"/></p>
+![demo.png](design/demo.png)
 
 > Download the .zip package directly, extract, and run it. If it cannot run, follow the tutorial below to try installing the conda environment and running the source code.
 
@@ -30,33 +31,51 @@ Windows GPU Version v1.1.0 (GPU):
 **Pre-built Package Comparison**:
 
 | Pre-built Package Name          | Python | Paddle | Torch | Environment                       | Supported Compute Capability Range |
-|----------------------------------|--------|--------|--------|-----------------------------------|------------------------------------|
-| `vse-windows-directml.7z`        | 3.12   | 3.0.0 | 2.4.1 | Windows without Nvidia GPU         | Universal                         |
-| `vse-windows-nvidia-cuda-11.8.7z`| 3.12   | 3.0.0 | 2.7.0 | CUDA 11.8                         | 3.5 – 8.9                          |
-| `vse-windows-nvidia-cuda-12.6.7z`| 3.12   | 3.0.0 | 2.7.0 | CUDA 12.6                         | 5.0 – 8.9                          |
-| `vse-windows-nvidia-cuda-12.8.7z`| 3.12   | 3.0.0 | 2.7.0 | CUDA 12.8                         | 5.0 – 9.0+                          |
+|----------------------------------|------|-------|--------|-----------------------------------|------------------------------------|
+| `vse-windows-cpu.7z`             | 3.12 | 3.0.0 | 2.7.0 | Universal                  | Universal                         |
+| `vse-windows-directml.7z`        | 3.12 | 3.0.0 | 2.4.1 | Windows without Nvidia GPU | Universal                         |
+| `vse-windows-nvidia-cuda-11.8.7z`| 3.12 | 3.0.0 | 2.7.0 | CUDA 11.8                  | 3.5 – 8.9                         |
+| `vse-windows-nvidia-cuda-12.6.7z`| 3.12 | 3.0.0 | 2.7.0 | CUDA 12.6                  | 5.0 – 8.9                         |
+| `vse-windows-nvidia-cuda-12.8.7z`| 3.12 | 3.0.0 | 2.7.0 | CUDA 12.8                  | 5.0 – 9.0+                        |
 
 > NVIDIA provides a list of supported compute capabilities for each GPU model. You can refer to the following link: [CUDA GPUs](https://developer.nvidia.com/cuda-gpus) to check which CUDA version is compatible with your GPU.
 
 **Docker Versions:**
 ```shell
   # Nvidia 10, 20, 30 Series Graphics Cards
-  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.1.1-cuda11.8 
+  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.4.0-cuda11.8 python backend/main.py -i test/test.mp4 -o test/test_no_sub.mp4
 
   # Nvidia 40 Series Graphics Cards
-  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.1.1-cuda12.6 
+  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.4.0-cuda12.6 python backend/main.py -i test/test.mp4 -o test/test_no_sub.mp4 
 
   # Nvidia 50 Series Graphics Cards
-  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.1.1-cuda12.8 
+  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.4.0-cuda12.8 python backend/main.py -i test/test.mp4 -o test/test_no_sub.mp4
 
   # AMD / Intel Dedicated or Integrated Graphics
-  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.1.1-directml 
+  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.4.0-directml python backend/main.py -i test/test.mp4 -o test/test_no_sub.mp4
 
-  # Demo video, input
-  /vsr/test/test.mp4
+  # CPU
+  docker run -it --name vsr --gpus all eritpchy/video-subtitle-remover:1.4.0-cpu python backend/main.py -i test/test.mp4 -o test/test_no_sub.mp4
+
+  # Copy to host
   docker cp vsr:/vsr/test/test_no_sub.mp4 ./
 ```
 
+**Commandline:**
+```
+Video Subtitle Remover Command Line Tool
+
+options:
+  -h, --help            show this help message and exit
+  --input INPUT, -i INPUT
+                        Input video file path
+  --output OUTPUT, -o OUTPUT
+                        Output video file path (optional)
+  --subtitle-area-coords YMIN YMAX XMIN XMAX, -c YMIN YMAX XMIN XMAX
+                        Subtitle area coordinates (ymin ymax xmin xmax). Can be specified multiple times for multiple areas.
+  --inpaint-mode {sttn-auto,sttn-det,lama,propainter,opencv}
+                        Inpaint mode, default is sttn-auto
+```
 ## Demonstration
 
 - GUI:
@@ -114,7 +133,7 @@ cd <source_code_directory>
 
 #### 4. Install the Appropriate Runtime Environment
 
-This project supports two runtime modes: CUDA (NVIDIA GPU acceleration) and DirectML (AMD, Intel, and other GPUs/APUs).
+This project supports four running modes: CUDA (NVIDIA GPU acceleration), CPU (no GPU), DirectML (AMD, Intel and other GPU/APU acceleration), and macOS (Apple Silicon).
 
 ##### (1) CUDA (For NVIDIA GPU users)
 
@@ -151,6 +170,16 @@ This project supports two runtime modes: CUDA (NVIDIA GPU acceleration) and Dire
   pip install -r requirements.txt
   ```
 
+- For Linux systems, you also need to install
+
+  ```shell
+  # for cuda 12.x
+  pip install onnxruntime-gpu==1.22.0
+  # for cuda 11.x
+  pip install onnxruntime-gpu==1.20.1 --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-11/pypi/simple/
+  ```
+  > For more details, see: [Install ONNX Runtime](https://onnxruntime.ai/docs/install/#install-onnx-runtime-gpu-cuda-12x)
+
 ##### (2) DirectML (For AMD, Intel, and other GPU/APU users)
 
 - Suitable for Windows devices with AMD/NVIDIA/Intel GPUs.
@@ -161,6 +190,25 @@ This project supports two runtime modes: CUDA (NVIDIA GPU acceleration) and Dire
   pip install -r requirements_directml.txt
   ```
 
+##### (3) CPU Only (For systems without GPU or those not wanting to use GPU acceleration)
+
+- Suitable for systems without GPU or those that do not wish to use GPU.
+  ```shell
+  pip install paddlepaddle==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
+  pip install torch==2.7.0 torchvision==0.22.0
+  pip install -r requirements.txt
+  ```
+
+##### (4) Running on macOS (Apple Silicon)
+- Suitable for macOS (Apple Silicon) devices
+- For macOS (Intel), please use the CPU mode. Forcing GPU usage will only be slower.
+- On macOS (Apple Silicon), the accuracy of the PP-OCRv4-Server model for subtitle detection seems suboptimal. We recommend using an alternative model.
+  ```shell
+  pip install paddlepaddle==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
+  pip install torch==2.7.0 torchvision==0.22.0
+  pip install -r requirements.txt
+  ```
+  > Tested with Python 3.13
 
 #### 4. Run the program
 

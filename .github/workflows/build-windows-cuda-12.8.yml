@@ -61,7 +61,8 @@ jobs:
     - run: |
         python backend/tools/makedist.py --cuda 12.8 && \
         mv ../vsr_out ./vsr_out && \
-        cp ./vsr_out/Debug/Debug-进入虚拟环境.cmd ./vsr_out/Release/
+        cp ./vsr_out/Debug/Debug-进入虚拟环境.cmd ./vsr_out/Release/ && \
+        sed -i 's/force=False)/force=False)\n            exit(-1)/g' ./vsr_out/*/Python/Lib/site-packages/qpt/executor.py
       env:
         QPT_Action: "True"
       shell: bash

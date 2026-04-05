@@ -36,6 +36,8 @@ jobs:
             version: "12.8"
           - type: directml
             version: "latest"
+          - type: cpu
+            version: "latest"
 
     steps:
     
@@ -95,3 +97,4 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: ${{ secrets.DOCKERHUB_USERNAME }}/video-subtitle-remover
+          enable-url-completion: true

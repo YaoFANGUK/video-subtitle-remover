@@ -1,9 +1,11 @@
 ''' Spatial-Temporal Transformer Networks
 '''
+import numpy as np
 import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision.models as models
 from backend.inpaint.utils.spectral_norm import spectral_norm as _spectral_norm
 
 
@@ -61,7 +63,7 @@ class BaseNetwork(nn.Module):
 
 
 class InpaintGenerator(BaseNetwork):
-    def __init__(self, init_weights=True):  # 1046
+    def __init__(self, init_weights=True):
         super(InpaintGenerator, self).__init__()
         channel = 256
         stack_num = 8
@@ -82,7 +84,7 @@ class InpaintGenerator(BaseNetwork):
             nn.LeakyReLU(0.2, inplace=True),
         )
 
-        # decoder: decode image from features
+        # decoder: decode frames from features
         self.decoder = nn.Sequential(
             deconv(channel, 128, kernel_size=3, padding=1),
             nn.LeakyReLU(0.2, inplace=True),
@@ -114,11 +116,9 @@ class InpaintGenerator(BaseNetwork):
         masks = masks.view(t, c, h, w)
         masks = F.interpolate(masks, scale_factor=1.0/4)
         t, c, _, _ = feat.size()
-        output = self.transformer({'x': feat, 'm': masks, 'b': 1, 'c': c})
-        enc_feat = output['x']
-        attn = output['attn']
-        mm = output['smm']
-        return enc_feat, attn, mm
+        enc_feat = self.transformer(
+            {'x': feat, 'm': masks, 'b': 1, 'c': c})['x']
+        return enc_feat
 
 
 class deconv(nn.Module):
@@ -133,8 +133,9 @@ class deconv(nn.Module):
         return self.conv(x)
 
 
-# ##################################################
-# ################## Transformer ####################
+# #############################################################################
+# ############################# Transformer  ##################################
+# #############################################################################
 
 
 class Attention(nn.Module):
@@ -205,22 +206,14 @@ class MultiHeadedAttention(nn.Module):
                 tmp1.append(y)
             y = torch.cat(tmp1,1)
             '''
-            y, attn = self.attention(query, key, value, mm)
-
-            # return attention value for visualization 
-            # here we return the attention value of patchsize=18 
-            if width == 18:
-                select_attn = attn.view(t, out_h*out_w, t, out_h, out_w)[0]
-                # mm, [b, thw, thw]
-                select_mm = mm[0].view(t*out_h*out_w, t, out_h, out_w)[0]
-
+            y, _ = self.attention(query, key, value, mm)
             # 3) "Concat" using a view and apply a final linear.
             y = y.view(b, t, out_h, out_w, d_k, height, width)
             y = y.permute(0, 1, 4, 2, 5, 3, 6).contiguous().view(bt, d_k, h, w)
             output.append(y)
         output = torch.cat(output, 1)
         x = self.output_linear(output)
-        return x, select_attn, select_mm
+        return x
 
 
 # Standard 2 layerd FFN of transformer
@@ -251,10 +244,9 @@ class TransformerBlock(nn.Module):
 
     def forward(self, x):
         x, m, b, c = x['x'], x['m'], x['b'], x['c']
-        val, attn, mm = self.attention(x, m, b, c)
-        x = x + val
+        x = x + self.attention(x, m, b, c)
         x = x + self.feed_forward(x)
-        return {'x': x, 'm': m, 'b': b, 'c': c, 'attn': attn, 'smm': mm}
+        return {'x': x, 'm': m, 'b': b, 'c': c}
 
 
 # ######################################################################
