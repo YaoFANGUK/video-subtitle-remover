@@ -1,5 +1,4 @@
 import os
-import copy
 import time
 import sys
 from typing import List
@@ -52,8 +51,8 @@ class STTNInpaint:
         split_h = int(W_ori * 3 / 16)
         inpaint_area = get_inpaint_area_by_mask(W_ori, H_ori, split_h, mask)
         # 初始化帧存储变量
-        # 高分辨率帧存储列表
-        frames_hr = copy.deepcopy(input_frames)
+        # 高分辨率帧存储列表（浅拷贝 + 逐帧 copy，避免 deepcopy 开销）
+        frames_hr = [f.copy() for f in input_frames]
         frames_scaled = {}  # 存放缩放后帧的字典
         comps = {}  # 存放补全后帧的字典
         # 存储最终的视频帧
@@ -82,7 +81,7 @@ class STTNInpaint:
                 # 对于模式中的每一个段落
                 for k in range(len(inpaint_area)):
                     comp = cv2.resize(comps[k][j], (W_ori, split_h))  # 将补全帧缩放回原大小
-                    comp = cv2.cvtColor(np.array(comp).astype(np.uint8), cv2.COLOR_BGR2RGB)  # 转换颜色空间
+                    comp = cv2.cvtColor(comp.astype(np.uint8), cv2.COLOR_BGR2RGB)  # 转换颜色空间
                     # 获取遮罩区域并进行图像合成
                     mask_area = mask[inpaint_area[k][0]:inpaint_area[k][1], :]  # 取出遮罩区域
                     # 实现遮罩区域内的图像融合
@@ -286,7 +285,7 @@ class STTNAutoInpaint:
                     # 应用修复结果
                     for j in range(valid_frames_count):
                         if input_sub_remover is not None and input_sub_remover.gui_mode:
-                            original_frame = copy.deepcopy(frames_hr[j])
+                            original_frame = frames_hr[j].copy()
                         else:
                             original_frame = None
                             
@@ -299,7 +298,7 @@ class STTNAutoInpaint:
                                 if comp_idx < len(comps[k]):  # 确保索引有效
                                     # 将修复的图像重新扩展到原始分辨率，并融合到原始帧
                                     comp = cv2.resize(comps[k][comp_idx], (frame_info['W_ori'], split_h))
-                                    comp = cv2.cvtColor(np.array(comp).astype(np.uint8), cv2.COLOR_BGR2RGB)
+                                    comp = cv2.cvtColor(comp.astype(np.uint8), cv2.COLOR_BGR2RGB)
                                     mask_area = mask[inpaint_area[k][0]:inpaint_area[k][1], :]
                                     frame[inpaint_area[k][0]:inpaint_area[k][1], :, :] = mask_area * comp + (1 - mask_area) * frame[inpaint_area[k][0]:inpaint_area[k][1], :, :]
                         

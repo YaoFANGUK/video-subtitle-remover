@@ -24,6 +24,7 @@ from backend.tools.inpaint_tools import create_mask, batch_generator, expand_fra
 from backend.tools.model_config import ModelConfig
 from backend.tools.ffmpeg_cli import FFmpegCLI
 from backend.tools.subtitle_detect import SubtitleDetect
+from backend.tools.video_io import FramePrefetcher, FFmpegVideoWriter
 import tempfile
 import multiprocessing
 import time
@@ -60,8 +61,11 @@ class SubtitleRemover:
         self.frame_width = int(self.video_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         # 创建视频临时对象，windows下delete=True会有permission denied的报错
         self.video_temp_file = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False)
-        # 创建视频写对象
-        self.video_writer = cv2.VideoWriter(get_readable_path(self.video_temp_file.name), cv2.VideoWriter_fourcc(*'mp4v'), self.fps, self.size)
+        # 创建视频写对象（使用 FFmpeg libx264 编码，比 mp4v 质量更好、文件更小）
+        try:
+            self.video_writer = FFmpegVideoWriter(get_readable_path(self.video_temp_file.name), self.fps, self.size)
+        except Exception:
+            self.video_writer = cv2.VideoWriter(get_readable_path(self.video_temp_file.name), cv2.VideoWriter_fourcc(*'mp4v'), self.fps, self.size)
         self.video_out_path = os.path.abspath(os.path.join(os.path.dirname(self.video_path), f'{self.vd_name}_no_sub.mp4'))
         self.propainter_inpaint = None
         self.ext = os.path.splitext(vd_path)[-1]
@@ -167,8 +171,10 @@ class SubtitleRemover:
         propainter_inpaint = PropainterInpaint(device, self.model_config.PROPAINTER_MODEL_DIR, config.propainterMaxLoadNum.value)
         self.append_output(tr['Main']['ProcessingStartRemovingSubtitles'])
         index = 0
+        # 使用帧预读取，I/O 与推理重叠
+        reader = FramePrefetcher(self.video_cap)
         while True:
-            ret, frame = self.video_cap.read()
+            ret, frame = reader.read()
             if not ret:
                 break
             index += 1
@@ -199,7 +205,7 @@ class SubtitleRemover:
                         inner_index = 0
                         # 一直读取到尾帧
                         while index < end_frame_no:
-                            ret, frame = self.video_cap.read()
+                            ret, frame = reader.read()
                             if not ret:
                                 break
                             index += 1
@@ -270,8 +276,10 @@ class SubtitleRemover:
             start_end_map[start] = end
         current_frame_index = 0
         self.append_output(tr['Main']['ProcessingStartRemovingSubtitles'])
+        # 使用帧预读取，I/O 与推理重叠
+        reader = FramePrefetcher(self.video_cap)
         while True:
-            ret, frame = self.video_cap.read()
+            ret, frame = reader.read()
             # 如果读取到为，则结束
             if not ret:
                 break
@@ -293,7 +301,7 @@ class SubtitleRemover:
                 inner_index = 0
                 # 接着往下读，直到读取到尾巴
                 for j in range(end_frame_index - start_frame_index):
-                    ret, frame = self.video_cap.read()
+                    ret, frame = reader.read()
                     if not ret:
                         break
                     current_frame_index += 1
@@ -322,6 +330,7 @@ class SubtitleRemover:
                             inner_index += 1
                             self.update_preview_with_comp(np.clip(batch[i]+mask[:,:,np.newaxis]*0.3,0,255).astype(np.uint8), inpainted_frame)
                     self.update_progress(tbar, increment=len(batch))
+        reader.stop()
 
     def run(self):
         # 记录开始时间

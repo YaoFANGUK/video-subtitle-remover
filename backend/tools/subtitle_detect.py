@@ -18,6 +18,9 @@ class SubtitleDetect:
     文本框检测类，用于检测视频帧中是否存在文本框
     """
 
+    # 每隔 sample_step 帧采样一次进行检测，大幅减少 OCR 推理次数
+    SAMPLE_STEP = 3
+
     def __init__(self, video_path, sub_areas=[]):
         self.video_path = video_path
         self.sub_areas = sub_areas
@@ -64,7 +67,8 @@ class SubtitleDetect:
         frame_count = video_cap.get(cv2.CAP_PROP_FRAME_COUNT)
         tbar = tqdm(total=int(frame_count), unit='frame', position=0, file=sys.__stdout__, desc='Subtitle Finding')
         current_frame_no = 0
-        subtitle_frame_no_box_dict = {}
+        # 阶段1：采样检测，仅对每隔 sample_step 帧执行 OCR
+        sampled_results = {}  # frame_no -> temp_list
         if sub_remover:
             sub_remover.append_output(tr['Main']['ProcessingStartFindingSubtitles'])
         while video_cap.isOpened():
@@ -77,12 +81,27 @@ class SubtitleDetect:
             if not is_frame_number_in_ab_sections(current_frame_no - 1, sub_remover.ab_sections):
                 tbar.update(1)
                 continue
-            temp_list = self.detect_subtitle(frame)
-            if len(temp_list) > 0:
-                subtitle_frame_no_box_dict[current_frame_no] = temp_list
+            # 仅对采样帧执行 OCR 推理
+            if (current_frame_no - 1) % self.SAMPLE_STEP == 0 or self.SAMPLE_STEP <= 1:
+                temp_list = self.detect_subtitle(frame)
+                if len(temp_list) > 0:
+                    sampled_results[current_frame_no] = temp_list
             tbar.update(1)
             if sub_remover:
                 sub_remover.progress_total = (100 * float(current_frame_no) / float(frame_count)) // 2
+        video_cap.release()
+        # 阶段2：插值填充 — 两个采样帧之间都有字幕时，中间帧也标记为有字幕
+        subtitle_frame_no_box_dict = {}
+        detected_nos = sorted(sampled_results.keys())
+        for i in range(len(detected_nos)):
+            f = detected_nos[i]
+            subtitle_frame_no_box_dict[f] = sampled_results[f]
+            if i + 1 < len(detected_nos):
+                next_f = detected_nos[i + 1]
+                # 间隔不超过 2 个采样步长，填充中间帧
+                if next_f - f <= self.SAMPLE_STEP * 2:
+                    for fill_f in range(f + 1, next_f):
+                        subtitle_frame_no_box_dict[fill_f] = sampled_results[f]
         subtitle_frame_no_box_dict = self.unify_regions(subtitle_frame_no_box_dict)
         if sub_remover:
             sub_remover.append_output(tr['Main']['FinishedFindingSubtitles'])

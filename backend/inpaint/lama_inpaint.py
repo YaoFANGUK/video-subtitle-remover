@@ -1,5 +1,4 @@
 import os
-import copy
 from typing import Union, List
 import torch
 import numpy as np
@@ -40,8 +39,8 @@ class LamaInpaint:
         split_h = int(W_ori * 3 / 16)
         inpaint_area = get_inpaint_area_by_mask(W_ori, H_ori, split_h, mask)
         # 初始化帧存储变量
-        # 高分辨率帧存储列表
-        frames_hr = copy.deepcopy(input_frames)
+        # 高分辨率帧存储列表（浅拷贝 + 逐帧 copy，避免 deepcopy 开销）
+        frames_hr = [f.copy() for f in input_frames]
         frames_scaled = {}  # 存放缩放后帧的字典
         masks_scaled = {}  # 存放缩放后遮罩的字典
         comps = {}  # 存放补全后帧的字典
