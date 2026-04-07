@@ -89,11 +89,8 @@ class SubtitleExtractorGUI(FluentWindow):
             self.stackWidget.setCurrentIndex(1)
 
     def closeEvent(self, event):
-        """程序关闭时保存窗口位置并恢复标准输出和标准错误"""
+        """程序关闭时保存窗口位置并清理资源"""
         self.save_window_position()
-        # 断开信号连接
-        # self.themeListener.terminate()
-        # self.themeListener.deleteLater()
         ProcessManager.instance().terminate_all()
         super().closeEvent(event)
 

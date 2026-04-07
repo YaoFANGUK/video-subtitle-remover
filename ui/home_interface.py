@@ -7,7 +7,8 @@ import traceback
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout
 from PySide6.QtCore import Slot, QRect, Signal
 from PySide6 import QtWidgets
-from qfluentwidgets import (PushButton, CardWidget, PlainTextEdit, FluentIcon)
+from datetime import datetime
+from qfluentwidgets import (PushButton, CardWidget, TextEdit, FluentIcon)
 from ui.setting_interface import SettingInterface
 from ui.component.video_display_component import VideoDisplayComponent
 from ui.component.task_list_component import TaskListComponent, TaskStatus, TaskOptions
@@ -18,10 +19,13 @@ from backend.tools.process_manager import ProcessManager
 from backend.tools.common_tools import get_readable_path, is_image_file, read_image
 
 class HomeInterface(QWidget):
-    progress_signal = Signal(int, bool) 
+    progress_signal = Signal(int, bool)
     append_log_signal = Signal(list)
     update_preview_with_comp_signal = Signal(list)
     task_error_signal = Signal(object)
+    toggle_buttons_signal = Signal(bool)  # True=显示运行按钮, False=显示停止按钮
+    task_status_signal = Signal(int, object)  # (task_index, TaskStatus)
+    select_task_signal = Signal(int)  # task_index
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.setObjectName("HomeInterface")
@@ -42,9 +46,10 @@ class HomeInterface(QWidget):
 
         # 添加自动滚动控制标志
         self.auto_scroll = True
-        self.running_task = False
+        self._stop_event = threading.Event()  # 线程安全的停止信号
+        self._worker_thread = None
         self.running_process = None
-        
+
         # 当前正在处理的任务索引
         self.current_processing_task_index = -1
 
@@ -53,6 +58,9 @@ class HomeInterface(QWidget):
         self.append_log_signal.connect(self.append_log)
         self.update_preview_with_comp_signal.connect(self.update_preview_with_comp)
         self.task_error_signal.connect(self.on_task_error)
+        self.toggle_buttons_signal.connect(self._toggle_buttons)
+        self.task_status_signal.connect(lambda idx, status: self.task_list_component.update_task_status(idx, status))
+        self.select_task_signal.connect(self.task_list_component.select_task)
 
     def __init_widgets(self):
         """创建主页面"""
@@ -76,7 +84,7 @@ class HomeInterface(QWidget):
         self.video_slider.valueChanged.connect(self.slider_changed)
         
         # 输出文本区域
-        self.output_text = PlainTextEdit()
+        self.output_text = TextEdit()
         self.output_text.setMinimumHeight(150)
         self.output_text.setReadOnly(True)
         self.output_text.document().setDocumentMargin(10)        
@@ -275,95 +283,104 @@ class HomeInterface(QWidget):
 
     def stop_button_clicked(self):
         try:
-            self.running_task = False
+            self._stop_event.set()
             running_process = self.running_process
             if running_process:
                 ProcessManager.instance().terminate_by_process(running_process)
             # 更新任务状态为待处理
             if self.current_processing_task_index >= 0:
                 self.task_list_component.update_task_status(self.current_processing_task_index, TaskStatus.PENDING)
-        finally:    
+        finally:
             self.running_process = None
             self.run_button.setVisible(True)
             self.stop_button.setVisible(False)
+
+    @Slot(bool)
+    def _toggle_buttons(self, show_run):
+        """线程安全地切换按钮可见性"""
+        self.run_button.setVisible(show_run)
+        self.stop_button.setVisible(not show_run)
 
     def run_button_clicked(self):
         if not self.task_list_component.get_pending_tasks():
             self.append_output(tr['SubtitleExtractorGUI']['OpenVideoFirst'])
             return
-            
+
         try:
             # 获取所有待执行的任务
             pending_tasks = self.task_list_component.get_pending_tasks()
             if not pending_tasks:
                 return
-            
-            self.run_button.setVisible(False)
-            self.stop_button.setVisible(True)
+
+            self._stop_event.clear()
+            self.toggle_buttons_signal.emit(False)
             # 开启后台线程处理视频
             def task():
-                self.running_task = True
                 try:
-                    while self.running_task:
+                    while not self._stop_event.is_set():
                         try:
                             pending_tasks = self.task_list_component.get_pending_tasks()
                             if not pending_tasks:
                                 break
                             pending_task = pending_tasks[0]
                             # 更新当前处理的任务索引
-                            self.current_processing_task_index, task = pending_task
-                            if not self.load_video(task.path):
-                                self.append_output(tr['SubtitleExtractorGUI']['OpenVideoFailed'].format(task.path))
-                                self.task_list_component.update_task_status(self.current_processing_task_index, TaskStatus.FAILED)
+                            self.current_processing_task_index, task_item = pending_task
+                            if not self.load_video(task_item.path):
+                                self.append_log_signal.emit([tr['SubtitleExtractorGUI']['OpenVideoFailed'].format(task_item.path)])
+                                self.task_status_signal.emit(self.current_processing_task_index, TaskStatus.FAILED)
                                 continue
-                            
+
                             # 获取字幕区域坐标
                             subtitle_areas = self.task_list_component.get_task_option(self.current_processing_task_index, TaskOptions.SUB_AREAS, [])
                             if not subtitle_areas or len(subtitle_areas) <= 0:
-                                self.append_output(tr['SubtitleExtractorGUI']['SelectSubtitleArea'].format(task.path))
-                                self.task_list_component.update_task_status(self.current_processing_task_index, TaskStatus.FAILED)
+                                self.append_log_signal.emit([tr['SubtitleExtractorGUI']['SelectSubtitleArea'].format(task_item.path)])
+                                self.task_status_signal.emit(self.current_processing_task_index, TaskStatus.FAILED)
                                 continue
 
                             self.video_display_component.save_selections_to_config()
 
                             # 更新任务状态为运行中
                             self.task_list_component.update_task_progress(self.current_processing_task_index, 1)
-                            
+
                             # 选中当前任务
-                            self.task_list_component.select_task(self.current_processing_task_index)
-                            
+                            self.select_task_signal.emit(self.current_processing_task_index)
+
                             if self.video_cap:
                                 self.video_cap.release()
                                 self.video_cap = None
-                            
-                            self.task_list_component.update_task_status(self.current_processing_task_index, TaskStatus.PROCESSING)
+
+                            self.task_status_signal.emit(self.current_processing_task_index, TaskStatus.PROCESSING)
                             options = {}
-                            for key in task.options:
-                                value = task.options[key]
+                            for key in task_item.options:
+                                value = task_item.options[key]
                                 if key == TaskOptions.SUB_AREAS.value:
                                     value = self.video_display_component.preview_coordinates_to_video_coordinates(value)
                                 options[key] = value
                             # 清理缓存, 使用动态路径
-                            task.output_path = None
-                            output_path = task.output_path
-                            process = self.run_subtitle_remover_process(task.path, output_path, options)
-                            
+                            task_item.output_path = None
+                            output_path = task_item.output_path
+                            process = self.run_subtitle_remover_process(task_item.path, output_path, options)
+
+                            # 检查是否在处理过程中被停止
+                            if self._stop_event.is_set():
+                                break
+
                             # 更新任务状态为已完成
-                            task = self.task_list_component.get_task(self.current_processing_task_index)
-                            if process.exitcode == 0 and task and task.status == TaskStatus.PROCESSING:
+                            task_obj = self.task_list_component.get_task(self.current_processing_task_index)
+                            if process.exitcode == 0 and task_obj and task_obj.status == TaskStatus.PROCESSING:
                                 self.progress_signal.emit(100, True)
                                 # 任务完成, 更新输出路径为只读
-                                task.output_path = output_path
-                                self.task_list_component.update_task_status(self.current_processing_task_index, TaskStatus.COMPLETED)
+                                task_obj.output_path = output_path
+                                self.task_status_signal.emit(self.current_processing_task_index, TaskStatus.COMPLETED)
                             else:
-                                self.task_list_component.update_task_status(self.current_processing_task_index, TaskStatus.FAILED)
-                            
+                                self.task_status_signal.emit(self.current_processing_task_index, TaskStatus.FAILED)
+
                         except Exception as e:
                             print(e)
-                            self.append_output(f"Error: {e}")
+                            self.append_log_signal.emit([f"Error: {e}"])
                             # 更新任务状态为失败
                             if self.current_processing_task_index >= 0:
-                                self.task_list_component.update_task_status(self.current_processing_task_index, TaskStatus.FAILED)
+                                self.task_status_signal.emit(self.current_processing_task_index, TaskStatus.FAILED)
                             break
                         finally:
                             if self.video_cap:
@@ -371,17 +388,14 @@ class HomeInterface(QWidget):
                                 self.video_cap = None
                             time.sleep(1)
                 finally:
-                    self.running_task = False
-                    self.run_button.setVisible(True)
-                    self.stop_button.setVisible(False)
+                    self.toggle_buttons_signal.emit(True)
 
-            threading.Thread(target=task, daemon=True).start()
+            self._worker_thread = threading.Thread(target=task, daemon=True)
+            self._worker_thread.start()
         except Exception as e:
             print(traceback.format_exc())
-            self.append_output(f"Error: {e}")
-            # 没有待执行的任务，恢复按钮状态
-            self.run_button.setVisible(True)
-            self.stop_button.setVisible(False)
+            self.append_log_signal.emit([f"Error: {e}"])
+            self.toggle_buttons_signal.emit(True)
 
     @staticmethod
     def remover_process(queue, video_path, output_path, options):
@@ -435,7 +449,7 @@ class HomeInterface(QWidget):
             args=(subtitle_remover_remote_caller.queue, video_path, output_path, options)
         )
         try:
-            if not self.running_task:
+            if self._stop_event.is_set():
                 return process
             process.start()
             ProcessManager.instance().add_process(process)
@@ -495,7 +509,20 @@ class HomeInterface(QWidget):
         """
         # 将所有参数转换为字符串并用空格连接
         text = ' '.join(str(arg) for arg in args).rstrip()
-        self.output_text.appendPlainText(text)
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        # 转义HTML特殊字符
+        escaped = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+        # 根据内容判断消息类型并着色
+        if '错误' in text or 'Error' in text or '失败' in text or 'Failed' in text:
+            color = '#e74c3c'
+        elif '成功' in text or '完成' in text or 'Success' in text or 'Finished' in text:
+            color = '#27ae60'
+        elif '警告' in text or 'Warning' in text:
+            color = '#f39c12'
+        else:
+            color = '#2980b9'
+        html = f'<span style="color:#888;">[{timestamp}]</span> <span style="color:{color};">{escaped}</span><br>'
+        self.output_text.append(html)
         print(*args)  # 保持原始的 print 行为
         # 如果启用了自动滚动，则滚动到底部
         if self.auto_scroll:
@@ -593,13 +620,22 @@ class HomeInterface(QWidget):
                 self.task_list_component.select_task(index)
 
     def closeEvent(self, event):
-        """窗口关闭时断开信号连接"""
+        """窗口关闭时断开信号连接并清理资源"""
         try:
+            # 通知 worker 线程停止
+            self._stop_event.set()
+            # 终止子进程
+            ProcessManager.instance().terminate_all()
+            # 等待 worker 线程结束（最多5秒）
+            if self._worker_thread and self._worker_thread.is_alive():
+                self._worker_thread.join(timeout=5)
+
             # 断开信号连接
             self.progress_signal.disconnect(self.update_progress)
             self.append_log_signal.disconnect(self.append_log)
             self.update_preview_with_comp_signal.disconnect(self.update_preview_with_comp)
             self.task_error_signal.disconnect(self.on_task_error)
+            self.toggle_buttons_signal.disconnect(self._toggle_buttons)
             self.video_display_component.video_slider.valueChanged.disconnect(self.slider_changed)
             self.video_display_component.ab_sections_changed.disconnect(self.ab_sections_changed)
             self.video_display_component.selections_changed.disconnect(self.selections_changed)
@@ -607,9 +643,6 @@ class HomeInterface(QWidget):
             if self.video_cap:
                 self.video_cap.release()
                 self.video_cap = None
-                
-            # 确保所有子进程都已终止
-            ProcessManager.instance().terminate_all()
         except Exception as e:
             print(f"Error during close window:", e)
         super().closeEvent(event)
