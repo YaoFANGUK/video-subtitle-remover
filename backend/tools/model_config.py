@@ -3,6 +3,11 @@ from backend.config import config, BASE_DIR
 from backend.tools.common_tools import merge_big_file_if_not_exists
 from backend.tools.constant import SubtitleDetectMode
 
+_MODEL_NAME_MAP = {
+    SubtitleDetectMode.PP_OCRv5_MOBILE: "PP-OCRv5_mobile_det",
+    SubtitleDetectMode.PP_OCRv5_SERVER: "PP-OCRv5_server_det",
+}
+
 class ModelConfig:
     def __init__(self):
         self.LAMA_MODEL_DIR = os.path.join(BASE_DIR, 'models', 'big-lama')
@@ -13,14 +18,9 @@ class ModelConfig:
             self.DET_MODEL_DIR = os.path.join(BASE_DIR,'models', 'V5', 'ch_det_fast')
         elif config.subtitleDetectMode.value == SubtitleDetectMode.PP_OCRv5_SERVER:
             self.DET_MODEL_DIR = os.path.join(BASE_DIR, 'models', 'V5', 'ch_det')
-        elif config.subtitleDetectMode.value == SubtitleDetectMode.PP_OCRv4_MOBILE:
-            self.DET_MODEL_DIR = os.path.join(BASE_DIR,'models', 'V4', 'ch_det_fast')
-        elif config.subtitleDetectMode.value == SubtitleDetectMode.PP_OCRv4_SERVER:
-            self.DET_MODEL_DIR = os.path.join(BASE_DIR, 'models', 'V4', 'ch_det')
         else:
             raise ValueError(f"Invalid subtitle detect mode: {config.subtitleDetectMode.value}")
+        self.DET_MODEL_NAME = _MODEL_NAME_MAP[config.subtitleDetectMode.value]
 
         merge_big_file_if_not_exists(self.LAMA_MODEL_DIR, 'bit-lama.pt')
         merge_big_file_if_not_exists(self.PROPAINTER_MODEL_DIR, 'ProPainter.pth')
-        merge_big_file_if_not_exists(self.DET_MODEL_DIR, 'inference.onnx')
-    

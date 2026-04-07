@@ -1,4 +1,0 @@
-filename,filesize,encoding,header
-inference_1.onnx,50000000,,
-inference_2.onnx,50000000,,
-inference_3.onnx,13443410,,

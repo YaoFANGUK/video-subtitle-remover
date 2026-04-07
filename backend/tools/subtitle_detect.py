@@ -1,4 +1,3 @@
-import os
 import sys
 from functools import cached_property
 
@@ -27,36 +26,37 @@ class SubtitleDetect:
     def text_detector(self):
         import paddle
         paddle.disable_signal_handler()
-        from paddleocr.tools.infer import utility
-        from paddleocr.tools.infer.predict_det import TextDetector
+        from paddleocr import TextDetection
         hardware_accelerator = HardwareAccelerator.instance()
         onnx_providers = hardware_accelerator.onnx_providers
         model_config = ModelConfig()
-        parser = utility.init_args()
-        args = parser.parse_args([])
-        args.det_algorithm = 'DB'
-        args.det_model_dir = os.path.join(model_config.DET_MODEL_DIR, 'inference.onnx') if len(onnx_providers) > 0 else model_config.DET_MODEL_DIR
-        args.use_gpu=False
-        args.use_onnx=len(onnx_providers) > 0
-        args.onnx_providers=onnx_providers
-        return TextDetector(args)
+        return TextDetection(
+            model_name=model_config.DET_MODEL_NAME,
+            model_dir=model_config.DET_MODEL_DIR,
+            device="cpu",
+            enable_hpi=len(onnx_providers) > 0,
+        )
 
     def detect_subtitle(self, img):
         temp_list = []
-        dt_boxes, elapse = self.text_detector(img)
-        coordinate_list = get_coordinates(dt_boxes.tolist())
-        if coordinate_list:
-            for coordinate in coordinate_list:
-                xmin, xmax, ymin, ymax = coordinate
-                if self.sub_areas is not None and len(self.sub_areas) > 0:
-                    for sub_area in self.sub_areas:
-                        s_ymin, s_ymax, s_xmin, s_xmax = sub_area
-                        if (s_xmin <= xmin and xmax <= s_xmax
-                                and s_ymin <= ymin
-                                and ymax <= s_ymax):
-                            temp_list.append((xmin, xmax, ymin, ymax))
-                else:
-                    temp_list.append((xmin, xmax, ymin, ymax))
+        results = self.text_detector.predict(img)
+        for res in results:
+            dt_polys = res['dt_polys']
+            if dt_polys is None or len(dt_polys) == 0:
+                continue
+            coordinate_list = get_coordinates(dt_polys.tolist())
+            if coordinate_list:
+                for coordinate in coordinate_list:
+                    xmin, xmax, ymin, ymax = coordinate
+                    if self.sub_areas is not None and len(self.sub_areas) > 0:
+                        for sub_area in self.sub_areas:
+                            s_ymin, s_ymax, s_xmin, s_xmax = sub_area
+                            if (s_xmin <= xmin and xmax <= s_xmax
+                                    and s_ymin <= ymin
+                                    and ymax <= s_ymax):
+                                temp_list.append((xmin, xmax, ymin, ymax))
+                    else:
+                        temp_list.append((xmin, xmax, ymin, ymax))
         return temp_list
 
     def find_subtitle_frame_no(self, sub_remover=None):
