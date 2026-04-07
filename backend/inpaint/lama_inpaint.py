@@ -1,9 +1,10 @@
 import os
+import gc
 from typing import Union, List
 import torch
 import numpy as np
 from PIL import Image
-from backend.inpaint.utils.lama_util import prepare_img_and_mask
+from backend.inpaint.utils.lama_util import prepare_img_and_mask, get_image, pad_img_to_modulo
 from backend import config
 from backend.tools.inpaint_tools import get_inpaint_area_by_mask
 
@@ -26,6 +27,37 @@ class LamaInpaint:
             cur_res = cur_res[:orig_height, :orig_width]
             return cur_res
 
+    def _inpaint_batch(self, images: List[np.ndarray], masks: List[np.ndarray]):
+        """批量推理：将多帧合并为一个 batch tensor 一次性送入 GPU"""
+        if len(images) == 1:
+            return [self.inpaint(images[0], masks[0])]
+
+        orig_height, orig_width = images[0].shape[:2]
+        batch_imgs = []
+        batch_masks = []
+        for img, msk in zip(images, masks):
+            batch_imgs.append(get_image(img))
+            batch_masks.append(get_image(msk))
+
+        # 堆叠为 (B, C, H, W) 并 pad 到 8 的倍数
+        batch_imgs = np.stack(batch_imgs)
+        batch_masks = np.stack(batch_masks)
+
+        # 对每个样本做 pad
+        padded_imgs = np.stack([pad_img_to_modulo(img, 8) for img in batch_imgs])
+        padded_masks = np.stack([pad_img_to_modulo(m, 8) for m in batch_masks])
+
+        img_tensor = torch.from_numpy(padded_imgs).to(self.device)
+        mask_tensor = torch.from_numpy(padded_masks).to(self.device)
+        mask_tensor = (mask_tensor > 0) * 1
+
+        with torch.inference_mode():
+            inpainted = self.model(img_tensor, mask_tensor)
+            results = inpainted.permute(0, 2, 3, 1).detach().cpu().numpy()
+            results = np.clip(results * 255, 0, 255).astype('uint8')
+
+        return [results[i][:orig_height, :orig_width] for i in range(len(images))]
+
     def __call__(self, input_frames: List[np.ndarray], input_mask: np.ndarray):
         """
         :param input_frames: 原视频帧
@@ -38,48 +70,37 @@ class LamaInpaint:
         # 确定去字幕的垂直高度部分
         split_h = int(W_ori * 3 / 16)
         inpaint_area = get_inpaint_area_by_mask(W_ori, H_ori, split_h, mask)
-        # 初始化帧存储变量
-        # 高分辨率帧存储列表（浅拷贝 + 逐帧 copy，避免 deepcopy 开销）
+        # 高分辨率帧存储列表
         frames_hr = [f.copy() for f in input_frames]
-        frames_scaled = {}  # 存放缩放后帧的字典
-        masks_scaled = {}  # 存放缩放后遮罩的字典
         comps = {}  # 存放补全后帧的字典
         # 存储最终的视频帧
         inpainted_frames = []
-        for k in range(len(inpaint_area)):
-            frames_scaled[k] = []  # 为每个去除部分初始化一个列表
-            masks_scaled[k] = []  # 为每个去除部分初始化一个列表
 
-        # 读取并缩放帧
-        for j in range(len(frames_hr)):
-            image = frames_hr[j]
-            # 对每个去除部分进行切割和缩放
-            for k in range(len(inpaint_area)):
-                image_crop = image[inpaint_area[k][0]:inpaint_area[k][1], :, :]  # 切割
-                mask_crop = mask[inpaint_area[k][0]:inpaint_area[k][1], :, :]  # 切割
-                frames_scaled[k].append(image_crop)  # 将切割后的帧添加到对应列表
-                masks_scaled[k].append(mask_crop)  # 将切割后的遮罩添加到对应列表
-
-        # 处理每一个去除部分
         for k in range(len(inpaint_area)):
-            # 调用inpaint函数逐帧处理
-            comps[k] = []
-            for i in range(len(frames_scaled[k])):
-                inpainted_frame = self.inpaint(frames_scaled[k][i], masks_scaled[k][i])
-                comps[k].append(inpainted_frame)
+            # 收集该区域的所有裁剪帧和遮罩
+            cropped_frames = []
+            cropped_masks = []
+            for j in range(len(frames_hr)):
+                image_crop = frames_hr[j][inpaint_area[k][0]:inpaint_area[k][1], :, :]
+                mask_crop = mask[inpaint_area[k][0]:inpaint_area[k][1], :, :]
+                cropped_frames.append(image_crop)
+                cropped_masks.append(mask_crop)
+
+            # 批量推理
+            comps[k] = self._inpaint_batch(cropped_frames, cropped_masks)
+            del cropped_frames, cropped_masks
+            gc.collect()
 
         # 如果存在去除部分
         if inpaint_area:
             for j in range(len(frames_hr)):
-                frame = frames_hr[j]  # 取出原始帧
-                # 对于模式中的每一个段落
+                frame = frames_hr[j]
                 for k in range(len(inpaint_area)):
-                    comp = comps[k][j]  # 获取补全后的帧
-                    # 实现遮罩区域内的图像融合
-                    frame[inpaint_area[k][0]:inpaint_area[k][1], :, :] = comp
-                # 将最终帧添加到列表
+                    frame[inpaint_area[k][0]:inpaint_area[k][1], :, :] = comps[k][j]
                 inpainted_frames.append(frame)
-                # print(f'processing frame, {len(frames_hr) - j} left')
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         return inpainted_frames
 
 

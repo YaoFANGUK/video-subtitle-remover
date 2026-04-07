@@ -1,6 +1,7 @@
 import os
 import time
 import sys
+import gc
 from typing import List
 
 import cv2
@@ -15,6 +16,8 @@ from backend.config import config
 from backend.inpaint.sttn.auto_sttn import InpaintGenerator
 from backend.inpaint.utils.sttn_utils import Stack, ToTorchFormatTensor
 from backend.tools.inpaint_tools import get_inpaint_area_by_mask, is_frame_number_in_ab_sections
+from backend.tools.video_io import FramePrefetcher
+from backend.tools.hardware_accelerator import HardwareAccelerator
 
 # 定义图像预处理方式
 _to_tensors = transforms.Compose([
@@ -125,7 +128,7 @@ class STTNInpaint:
         feats = feats.to(self.device)
         # 初始化一个与视频长度相同的列表，用于存储处理完成的帧
         comp_frames = [None] * frame_length
-        # 关闭梯度计算，用于推理阶段节省内存并加速
+        # 统一关闭梯度计算，用于推理阶段节省内存并加速
         with torch.no_grad():
             # 将处理好的帧通过编码器，产生特征表示
             feats = self.model.encoder(feats.view(frame_length, 3, self.model_input_height, self.model_input_width))
@@ -133,33 +136,27 @@ class STTNInpaint:
             _, c, feat_h, feat_w = feats.size()
             # 调整特征形状以匹配模型的期望输入
             feats = feats.view(1, frame_length, c, feat_h, feat_w)
-        # 获取重绘区域
-        # 在设定的邻居帧步幅内循环处理视频
-        for f in range(0, frame_length, self.neighbor_stride):
-            # 计算邻近帧的ID
-            neighbor_ids = [i for i in range(max(0, f - self.neighbor_stride), min(frame_length, f + self.neighbor_stride + 1))]
-            # 获取参考帧的索引
-            ref_ids = self.get_ref_index(neighbor_ids, frame_length)
-            # 同样关闭梯度计算
-            with torch.no_grad():
+            # 在设定的邻居帧步幅内循环处理视频
+            for f in range(0, frame_length, self.neighbor_stride):
+                # 计算邻近帧的ID
+                neighbor_ids = [i for i in range(max(0, f - self.neighbor_stride), min(frame_length, f + self.neighbor_stride + 1))]
+                # 获取参考帧的索引
+                ref_ids = self.get_ref_index(neighbor_ids, frame_length)
                 # 通过模型推断特征并传递给解码器以生成完成的帧
                 pred_feat = self.model.infer(feats[0, neighbor_ids + ref_ids, :, :, :])
-                # 将预测的特征通过解码器生成图片，并应用激活函数tanh，然后分离出张量
-                pred_img = torch.tanh(self.model.decoder(pred_feat[:len(neighbor_ids), :, :, :])).detach()
-                # 将结果张量重新缩放到0到255的范围内（图像像素值）
+                # 将预测的特征通过解码器生成图片，并应用激活函数tanh
+                pred_img = torch.tanh(self.model.decoder(pred_feat[:len(neighbor_ids), :, :, :]))
+                # 将结果张量重新缩放到0到255的范围内
                 pred_img = (pred_img + 1) / 2
                 # 将张量移动回CPU并转为NumPy数组
                 pred_img = pred_img.cpu().permute(0, 2, 3, 1).numpy() * 255
                 # 遍历邻近帧
                 for i in range(len(neighbor_ids)):
                     idx = neighbor_ids[i]
-                    # 将预测的图片转换为无符号8位整数格式
-                    img = np.array(pred_img[i]).astype(np.uint8)
+                    img = pred_img[i].astype(np.uint8)
                     if comp_frames[idx] is None:
-                        # 如果该位置为空，则赋值为新计算出的图片
                         comp_frames[idx] = img
                     else:
-                        # 如果此位置之前已有图片，则将新旧图片混合以提高质量
                         comp_frames[idx] = comp_frames[idx].astype(np.float32) * 0.5 + img.astype(np.float32) * 0.5
         # 返回处理完成的帧序列
         return comp_frames
@@ -203,6 +200,8 @@ class STTNAutoInpaint:
         try:
             # 读取视频帧信息
             reader, frame_info = self.read_frame_info_from_video()
+            # 使用帧预读取，I/O 与推理重叠
+            prefetcher = FramePrefetcher(reader)
             if input_sub_remover is not None:
                 ab_sections = input_sub_remover.ab_sections
                 
@@ -212,24 +211,35 @@ class STTNAutoInpaint:
                 # 创建视频写入对象，用于输出修复后的视频
                 writer = cv2.VideoWriter(self.video_out_path, cv2.VideoWriter_fourcc(*"mp4v"), frame_info['fps'], (frame_info['W_ori'], frame_info['H_ori']))
             
-            # 计算需要迭代修复视频的次数
-            rec_time = frame_info['len'] // self.clip_gap if frame_info['len'] % self.clip_gap == 0 else frame_info['len'] // self.clip_gap + 1
             # 计算分割高度，用于确定修复区域的大小
             split_h = int(frame_info['W_ori'] * 3 / 16)
-            
+
             if input_mask is None:
                 # 读取掩码
                 mask = self.sttn_inpaint.read_mask(self.mask_path)
             else:
                 _, mask = cv2.threshold(input_mask, 127, 1, cv2.THRESH_BINARY)
                 mask = mask[:, :, None]
-                
+
             # 得到修复区域位置
             inpaint_area = get_inpaint_area_by_mask(frame_info['W_ori'], frame_info['H_ori'], split_h, mask)
+            # 根据可用显存动态调整 clip_gap，避免 OOM
+            effective_clip_gap = self.clip_gap
+            vram_mb = HardwareAccelerator.instance().get_available_vram_mb()
+            if vram_mb > 0:
+                # 估算每帧约需 (W * H * 3 * 4) bytes，clip_gap帧约需 clip_gap * W * H * 12 bytes（含中间张量）
+                bytes_per_frame = frame_info['W_ori'] * frame_info['H_ori'] * 12
+                max_frames_by_vram = int(vram_mb * 1024 * 1024 / bytes_per_frame)
+                max_frames_by_vram = max(max_frames_by_vram, 10)  # 至少10帧
+                effective_clip_gap = min(self.clip_gap, max_frames_by_vram)
+                if effective_clip_gap < self.clip_gap:
+                    tqdm.write(f'GPU VRAM: {vram_mb:.0f}MB, adjusting clip_gap: {self.clip_gap} -> {effective_clip_gap}')
+            # 计算需要迭代修复视频的次数
+            rec_time = frame_info['len'] // effective_clip_gap if frame_info['len'] % effective_clip_gap == 0 else frame_info['len'] // effective_clip_gap + 1
             # 遍历每一次的迭代次数
             for i in range(rec_time):
-                start_f = i * self.clip_gap  # 起始帧位置
-                end_f = min((i + 1) * self.clip_gap, frame_info['len'])  # 结束帧位置
+                start_f = i * effective_clip_gap  # 起始帧位置
+                end_f = min((i + 1) * effective_clip_gap, frame_info['len'])  # 结束帧位置
                 tqdm.write(f'Processing: {start_f + 1} - {end_f} / Total: {frame_info['len']}')
                 
                 frames_hr = []  # 高分辨率帧列表
@@ -243,7 +253,7 @@ class STTNAutoInpaint:
                 # 读取和修复高分辨率帧
                 valid_frames_count = 0
                 for j in range(start_f, end_f):
-                    success, image = reader.read()
+                    success, image = prefetcher.read()
                     if not success:
                         print(f"Warning: Failed to read frame {j}.")
                         break
@@ -309,10 +319,17 @@ class STTNAutoInpaint:
                                 input_sub_remover.update_progress(tbar, increment=1)
                             if original_frame is not None and input_sub_remover.gui_mode:
                                 input_sub_remover.update_preview_with_comp(original_frame, frame)
+                # 每个chunk处理完后清理GPU缓存
+                del frames_hr, frames, comps
+                gc.collect()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
         except Exception as e:
             print(f"Error during video processing: {str(e)}")
             # 不抛出异常，允许程序继续执行
         finally:
+            if reader:
+                prefetcher.release()
             if writer:
                 writer.release()
 

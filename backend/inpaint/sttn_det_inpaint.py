@@ -126,38 +126,35 @@ class STTNDetInpaint:
         frame_length = len(frames)
         # 对帧进行预处理转换为张量，并进行归一化
         feats = _to_tensors(frames).unsqueeze(0) * 2 - 1
-        
+
         binary_masks = [np.expand_dims((np.array(m) > 0.5).astype(np.uint8), 2) for m in masks]
         # 将掩码转换为张量
-        masks = (_to_tensors(masks).unsqueeze(0) > 0.5).float()
-        
+        masks_tensor = (_to_tensors(masks).unsqueeze(0) > 0.5).float()
+
         # 把特征张量转移到指定的设备（CPU或GPU）
-        feats, masks = feats.to(self.device), masks.to(self.device)
+        feats, masks_tensor = feats.to(self.device), masks_tensor.to(self.device)
         # 初始化一个与视频长度相同的列表，用于存储处理完成的帧
         comp_frames = [None] * frame_length
-        # 关闭梯度计算，用于推理阶段节省内存并加速
+        # 统一关闭梯度计算，用于推理阶段节省内存并加速
         with torch.no_grad():
             # 将处理好的帧通过编码器，产生特征表示
-            feats = self.model.encoder((feats*(1-masks).float()).view(frame_length, 3, self.model_input_height, self.model_input_width))
+            feats = self.model.encoder((feats*(1-masks_tensor).float()).view(frame_length, 3, self.model_input_height, self.model_input_width))
             # 获取特征维度信息
             _, c, feat_h, feat_w = feats.size()
             # 调整特征形状以匹配模型的期望输入
             feats = feats.view(1, frame_length, c, feat_h, feat_w)
-        # 获取重绘区域
-        # 在设定的邻居帧步幅内循环处理视频
-        for f in range(0, frame_length, self.neighbor_stride):
-            # 计算邻近帧的ID
-            neighbor_ids = [i for i in range(max(0, f - self.neighbor_stride), min(frame_length, f + self.neighbor_stride + 1))]
-            # 获取参考帧的索引
-            ref_ids = self.get_ref_index(neighbor_ids, frame_length)
-            # 同样关闭梯度计算
-            with torch.no_grad():
+            # 在设定的邻居帧步幅内循环处理视频
+            for f in range(0, frame_length, self.neighbor_stride):
+                # 计算邻近帧的ID
+                neighbor_ids = [i for i in range(max(0, f - self.neighbor_stride), min(frame_length, f + self.neighbor_stride + 1))]
+                # 获取参考帧的索引
+                ref_ids = self.get_ref_index(neighbor_ids, frame_length)
                 # 通过模型推断特征并传递给解码器以生成完成的帧
                 pred_feat = self.model.infer(
-                    feats[0, neighbor_ids + ref_ids, :, :, :], masks[0, neighbor_ids + ref_ids, :, :, :])
+                    feats[0, neighbor_ids + ref_ids, :, :, :], masks_tensor[0, neighbor_ids + ref_ids, :, :, :])
 
-                # 将预测的特征通过解码器生成图片，并应用激活函数tanh，然后分离出张量
-                pred_img = torch.tanh(self.model.decoder(pred_feat[:len(neighbor_ids), :, :, :])).detach()
+                # 将预测的特征通过解码器生成图片，并应用激活函数tanh
+                pred_img = torch.tanh(self.model.decoder(pred_feat[:len(neighbor_ids), :, :, :]))
                 # 将结果张量重新缩放到0到255的范围内（图像像素值）
                 pred_img = (pred_img + 1) / 2
                 # 将张量移动回CPU并转为NumPy数组
@@ -166,13 +163,10 @@ class STTNDetInpaint:
                 for i in range(len(neighbor_ids)):
                     idx = neighbor_ids[i]
                     # 将预测的图片转换为无符号8位整数格式
-                    img = np.array(pred_img[i]).astype(
-                        np.uint8)*binary_masks[idx] + frames[idx] * (1-binary_masks[idx])
+                    img = pred_img[i].astype(np.uint8) * binary_masks[idx] + frames[idx] * (1 - binary_masks[idx])
                     if comp_frames[idx] is None:
-                        # 如果该位置为空，则赋值为新计算出的图片
                         comp_frames[idx] = img
                     else:
-                        # 如果此位置之前已有图片，则将新旧图片混合以提高质量
                         comp_frames[idx] = comp_frames[idx].astype(np.float32) * 0.5 + img.astype(np.float32) * 0.5
         # 返回处理完成的帧序列
         return comp_frames

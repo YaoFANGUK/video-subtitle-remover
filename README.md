@@ -1,5 +1,9 @@
 简体中文 | [English](README_en.md)
 
+<div align="center">
+  <img src="design/icon_1024.PNG" alt="VSR Logo" width="128" height="128">
+</div>
+
 ## 项目简介
 
 ![License](https://img.shields.io/badge/License-Apache%202-red.svg)

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
+import gc
 import cv2
-import copy
 import numpy as np
 import scipy.ndimage
 from PIL import Image
@@ -374,7 +374,7 @@ class PropainterInpaint:
         inpaint_area = get_inpaint_area_by_mask(W_ori, H_ori, split_h, mask, multiple=8)
         # 初始化帧存储变量
         # 高分辨率帧存储列表
-        frames_hr = copy.deepcopy(input_frames)
+        frames_hr = [f.copy() for f in input_frames]
         frames_scaled = {}  # 存放缩放后帧的字典
         masks_scaled = {}  # 存放缩放后遮罩的字典
         comps = {}  # 存放补全后帧的字典
@@ -398,6 +398,8 @@ class PropainterInpaint:
         for k in range(len(inpaint_area)):
             # 调用inpaint函数进行处理
             comps[k] = self.inpaint(frames_scaled[k], masks_scaled[k][0])
+            del frames_scaled[k], masks_scaled[k]
+            gc.collect()
 
         # 如果存在去除部分
         if inpaint_area:

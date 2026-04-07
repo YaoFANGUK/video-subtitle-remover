@@ -106,6 +106,27 @@ class HardwareAccelerator:
     def set_enabled(self, enable):
         self.__enabled = enable
 
+    def get_available_vram_mb(self):
+        """获取可用 GPU 显存（MB），无 GPU 返回 0"""
+        if not self.__enabled:
+            return 0
+        if self.__cuda:
+            try:
+                free_vram = torch.cuda.mem_get_info()[0]  # (free, total)
+                return free_vram / (1024 * 1024)
+            except Exception:
+                return 0
+        if self.__mps:
+            try:
+                # MPS 没有直接查询接口，使用系统内存作为参考
+                import subprocess
+                result = subprocess.run(['sysctl', '-n', 'hw.memsize'], capture_output=True, text=True)
+                total_mem = int(result.stdout.strip()) / (1024 * 1024)
+                return total_mem * 0.5  # 保守估计可用一半
+            except Exception:
+                return 0
+        return 0
+
     @property
     def device(self):
         """
