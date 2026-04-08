@@ -560,6 +560,9 @@ class HomeInterface(QWidget):
         if self.video_cap:
             self.video_cap.release()
             self.video_cap = None
+        # 如果是图片文件，直接走图片加载路径
+        if is_image_file(video_path):
+            return self.load_as_picture(video_path)
         self.video_cap = cv2.VideoCapture(get_readable_path(self.video_path))
         if not self.video_cap.isOpened():
             return self.load_as_picture(video_path)
@@ -570,7 +573,7 @@ class HomeInterface(QWidget):
         self.frame_height = int(self.video_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         self.frame_width = int(self.video_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.fps = self.video_cap.get(cv2.CAP_PROP_FPS)
-        
+
         self.update_preview(frame)
         self.video_slider.setMaximum(self.frame_count)
         self.video_slider.setValue(1)
@@ -601,7 +604,7 @@ class HomeInterface(QWidget):
             self,
             tr['SubtitleExtractorGUI']['Open'],
             "",
-            "All Files (*.*);;MP4 Files (*.mp4);;FLV Files (*.flv);;WMV Files (*.wmv);;AVI Files (*.avi)"
+            "All Files (*.*);;Video Files (*.mp4 *.flv *.wmv *.avi *.mkv *.mov);;Image Files (*.jpg *.jpeg *.png *.bmp *.webp *.tiff)"
         )
         if files:
             files_loaded = []
