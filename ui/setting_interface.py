@@ -65,6 +65,10 @@ class SettingInterface(QtWidgets.QVBoxLayout):
         # 添加一些空间
         self.addStretch(1)
     
+    def set_inpaint_mode_enabled(self, enabled):
+        """启用或禁用 inpaint 模式下拉框"""
+        self.inpaint_mode_combo.comboBox.setEnabled(enabled)
+
     def reset_setting(self):
         """重置所有设置为默认值"""
         # 这里需要实现重置逻辑

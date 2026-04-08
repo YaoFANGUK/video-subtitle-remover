@@ -14,6 +14,7 @@ from ui.component.video_display_component import VideoDisplayComponent
 from ui.component.task_list_component import TaskListComponent, TaskStatus, TaskOptions
 from ui.icon.my_fluent_icon import MyFluentIcon
 from backend.config import config, tr
+from backend.tools.constant import InpaintMode
 from backend.tools.subtitle_remover_remote_call import SubtitleRemoverRemoteCall
 from backend.tools.process_manager import ProcessManager
 from backend.tools.common_tools import get_readable_path, is_image_file, read_image
@@ -49,6 +50,7 @@ class HomeInterface(QWidget):
         self._stop_event = threading.Event()  # 线程安全的停止信号
         self._worker_thread = None
         self.running_process = None
+        self._saved_inpaint_mode = None  # 保存图片锁定前的 inpaint 模式
 
         # 当前正在处理的任务索引
         self.current_processing_task_index = -1
@@ -106,7 +108,8 @@ class HomeInterface(QWidget):
 
         # 设置容器
         settings_container = CardWidget(self)
-        settings_container.setLayout(SettingInterface(settings_container))
+        self.setting_interface = SettingInterface(settings_container)
+        settings_container.setLayout(self.setting_interface)
         right_layout.addWidget(settings_container)
         
         # 添加任务列表容器
@@ -330,12 +333,11 @@ class HomeInterface(QWidget):
                                 self.task_status_signal.emit(self.current_processing_task_index, TaskStatus.FAILED)
                                 continue
 
-                            # 获取字幕区域坐标
+                            # 获取字幕区域坐标，未选择则使用全屏
                             subtitle_areas = self.task_list_component.get_task_option(self.current_processing_task_index, TaskOptions.SUB_AREAS, [])
                             if not subtitle_areas or len(subtitle_areas) <= 0:
-                                self.append_log_signal.emit([tr['SubtitleExtractorGUI']['SelectSubtitleArea'].format(task_item.path)])
-                                self.task_status_signal.emit(self.current_processing_task_index, TaskStatus.FAILED)
-                                continue
+                                subtitle_areas = [(0, self.frame_height, 0, self.frame_width)]
+                                self.task_list_component.update_task_option(self.current_processing_task_index, TaskOptions.SUB_AREAS, subtitle_areas)
 
                             self.video_display_component.save_selections_to_config()
 
@@ -578,6 +580,8 @@ class HomeInterface(QWidget):
         self.video_slider.setMaximum(self.frame_count)
         self.video_slider.setValue(1)
         self.video_display_component.set_dragger_enabled(True)
+        # 视频模式下恢复用户原始的 inpaint 模式选择
+        self._unlock_inpaint_mode()
         return True
 
     def load_as_picture(self, path):
@@ -594,6 +598,25 @@ class HomeInterface(QWidget):
         self.fps = 1
         self.update_preview(frame)
         self.video_slider.setMaximum(self.frame_count)
+        self.video_slider.setValue(1)
+        self.video_display_component.set_dragger_enabled(True)
+        # 图片模式锁定为 LAMA
+        self._lock_inpaint_mode_to_lama()
+        return True
+
+    def _lock_inpaint_mode_to_lama(self):
+        """图片模式锁定 inpaint 模式为 LAMA"""
+        if self._saved_inpaint_mode is None:
+            self._saved_inpaint_mode = config.inpaintMode.value
+        config.set(config.inpaintMode, InpaintMode.LAMA)
+        self.setting_interface.set_inpaint_mode_enabled(False)
+
+    def _unlock_inpaint_mode(self):
+        """视频模式恢复用户原始的 inpaint 模式选择"""
+        if self._saved_inpaint_mode is not None:
+            config.set(config.inpaintMode, self._saved_inpaint_mode)
+            self._saved_inpaint_mode = None
+        self.setting_interface.set_inpaint_mode_enabled(True)
         self.video_slider.setValue(1)
         self.video_display_component.set_dragger_enabled(True)
         return True
