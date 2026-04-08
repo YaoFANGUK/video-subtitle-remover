@@ -92,6 +92,8 @@ class STTNInpaint:
                 # 将最终帧添加到列表
                 inpainted_frames.append(frame)
                 # print(f'processing frame, {len(frames_hr) - j} left')
+        else:
+            inpainted_frames = frames_hr
         return inpainted_frames
 
     @staticmethod

@@ -271,9 +271,9 @@ class SubtitleRemover:
         del sub_detector
         gc.collect()
         start_end_map = dict()
-        for interval in continuous_frame_no_list:
-            start, end = interval
-            start_end_map[start] = end
+        for start, end in continuous_frame_no_list:
+            # 确保区间不超出视频总帧数，否则会导致 FramePrefetcher 哨兵被内循环消费后外层死锁
+            start_end_map[start] = min(end, self.frame_count)
         current_frame_index = 0
         self.append_output(tr['Main']['ProcessingStartRemovingSubtitles'])
         # 使用帧预读取，I/O 与推理重叠
@@ -423,7 +423,7 @@ class SubtitleRemover:
                                  "-vn", "-loglevel", "error", temp.name]
         use_shell = True if os.name == "nt" else False
         try:
-            subprocess.check_output(audio_extract_command, stdin=open(os.devnull), shell=use_shell)
+            subprocess.check_output(audio_extract_command, stdin=open(os.devnull), shell=use_shell, timeout=600)
         except Exception as e:
             traceback.print_exc()
             self.append_output(tr['Main']['FailToExtractAudio'].format(str(e)))
@@ -437,7 +437,7 @@ class SubtitleRemover:
                                        "-acodec", "copy",
                                        "-loglevel", "error", self.video_out_path]
                 try:
-                    subprocess.check_output(audio_merge_command, stdin=open(os.devnull), shell=use_shell)
+                    subprocess.check_output(audio_merge_command, stdin=open(os.devnull), shell=use_shell, timeout=600)
                 except Exception as e:
                     traceback.print_exc()
                     self.append_output(tr['Main']['FailToMergeAudio'].format(str(e)))

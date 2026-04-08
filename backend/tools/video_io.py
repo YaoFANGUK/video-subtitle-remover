@@ -97,4 +97,8 @@ class FFmpegVideoWriter:
             self._process.stdin.close()
         except BrokenPipeError:
             pass
-        self._process.wait()
+        try:
+            self._process.wait(timeout=600)
+        except subprocess.TimeoutExpired:
+            self._process.terminate()
+            self._process.wait(timeout=5)
