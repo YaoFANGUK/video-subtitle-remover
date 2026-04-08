@@ -112,6 +112,13 @@ CONFIG_FILE = 'config/config.json'
 config = Config()
 qconfig.load(CONFIG_FILE, config)
 
+# 向后兼容：旧的 SubtitleDetectMode 枚举值为中文，迁移为新值
+_detect_mode_value = config.subtitleDetectMode.value
+if isinstance(_detect_mode_value, str) and _detect_mode_value in ("快速", "Fast"):
+    config.set(config.subtitleDetectMode, SubtitleDetectMode.PP_OCRv5_MOBILE)
+elif isinstance(_detect_mode_value, str) and _detect_mode_value in ("精准", "Precise"):
+    config.set(config.subtitleDetectMode, SubtitleDetectMode.PP_OCRv5_SERVER)
+
 # 读取界面语言配置
 tr = configparser.ConfigParser()
 

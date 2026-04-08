@@ -18,12 +18,25 @@ class SubtitleDetect:
     文本框检测类，用于检测视频帧中是否存在文本框
     """
 
-    # 每隔 sample_step 帧采样一次进行检测，大幅减少 OCR 推理次数
+    # 采样间隔，根据视频帧率在 _init_sample_step 中自适应设置
     SAMPLE_STEP = 3
 
     def __init__(self, video_path, sub_areas=[]):
         self.video_path = video_path
         self.sub_areas = sub_areas
+        self._init_sample_step()
+
+    def _init_sample_step(self):
+        """根据视频帧率自适应设置采样间隔，保持每秒至少采样8帧"""
+        cap = cv2.VideoCapture(get_readable_path(self.video_path))
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        cap.release()
+        if fps >= 60:
+            self.SAMPLE_STEP = 4
+        elif fps >= 30:
+            self.SAMPLE_STEP = 3
+        else:
+            self.SAMPLE_STEP = 2
 
     @cached_property
     def text_detector(self):
@@ -43,23 +56,29 @@ class SubtitleDetect:
     def detect_subtitle(self, img):
         temp_list = []
         results = self.text_detector.predict(img)
+        sub_areas = self.sub_areas
+        has_areas = sub_areas is not None and len(sub_areas) > 0
         for res in results:
             dt_polys = res['dt_polys']
             if dt_polys is None or len(dt_polys) == 0:
                 continue
             coordinate_list = get_coordinates(dt_polys.tolist())
-            if coordinate_list:
-                for coordinate in coordinate_list:
-                    xmin, xmax, ymin, ymax = coordinate
-                    if self.sub_areas is not None and len(self.sub_areas) > 0:
-                        for sub_area in self.sub_areas:
-                            s_ymin, s_ymax, s_xmin, s_xmax = sub_area
-                            if (s_xmin <= xmin and xmax <= s_xmax
-                                    and s_ymin <= ymin
-                                    and ymax <= s_ymax):
-                                temp_list.append((xmin, xmax, ymin, ymax))
-                    else:
+            if not coordinate_list:
+                continue
+            if not has_areas:
+                temp_list.extend(coordinate_list)
+            elif len(sub_areas) == 1:
+                # 单区域快速路径（最常见场景）
+                s_ymin, s_ymax, s_xmin, s_xmax = sub_areas[0]
+                for xmin, xmax, ymin, ymax in coordinate_list:
+                    if s_xmin <= xmin and xmax <= s_xmax and s_ymin <= ymin and ymax <= s_ymax:
                         temp_list.append((xmin, xmax, ymin, ymax))
+            else:
+                for xmin, xmax, ymin, ymax in coordinate_list:
+                    for s_ymin, s_ymax, s_xmin, s_xmax in sub_areas:
+                        if s_xmin <= xmin and xmax <= s_xmax and s_ymin <= ymin and ymax <= s_ymax:
+                            temp_list.append((xmin, xmax, ymin, ymax))
+                            break
         return temp_list
 
     def find_subtitle_frame_no(self, sub_remover=None):
@@ -93,15 +112,16 @@ class SubtitleDetect:
         # 阶段2：插值填充 — 两个采样帧之间都有字幕时，中间帧也标记为有字幕
         subtitle_frame_no_box_dict = {}
         detected_nos = sorted(sampled_results.keys())
-        for i in range(len(detected_nos)):
-            f = detected_nos[i]
+        max_gap = self.SAMPLE_STEP * 2
+        for f, next_f in zip(detected_nos, detected_nos[1:]):
             subtitle_frame_no_box_dict[f] = sampled_results[f]
-            if i + 1 < len(detected_nos):
-                next_f = detected_nos[i + 1]
-                # 间隔不超过 2 个采样步长，填充中间帧
-                if next_f - f <= self.SAMPLE_STEP * 2:
-                    for fill_f in range(f + 1, next_f):
-                        subtitle_frame_no_box_dict[fill_f] = sampled_results[f]
+            if next_f - f <= max_gap:
+                fill_mask = sampled_results[f]
+                for fill_f in range(f + 1, next_f):
+                    subtitle_frame_no_box_dict[fill_f] = fill_mask
+        # 添加最后一个检测帧
+        if detected_nos:
+            subtitle_frame_no_box_dict[detected_nos[-1]] = sampled_results[detected_nos[-1]]
         subtitle_frame_no_box_dict = self.unify_regions(subtitle_frame_no_box_dict)
         if sub_remover:
             sub_remover.append_output(tr['Main']['FinishedFindingSubtitles'])
@@ -241,43 +261,33 @@ class SubtitleDetect:
     def filter_and_merge_intervals(intervals, target_length):
         """
         合并传入的字幕起始区间，确保区间大小最低为STTN_REFERENCE_LENGTH
+        复杂度 O(n log n)
         """
+        if not intervals:
+            return []
+        intervals = sorted(intervals, key=lambda x: x[0])
+        # 一次遍历：扩展单点区间，利用排序后的相邻关系 O(n)
         expanded = []
-        # 首先单独处理单点区间以扩展它们
-        for start, end in intervals:
+        for i, (start, end) in enumerate(intervals):
             if start == end:  # 单点区间
-                # 扩展到接近的目标长度，但保证前后不重叠
                 prev_end = expanded[-1][1] if expanded else float('-inf')
-                next_start = float('inf')
-                # 查找下一个区间的起始点
-                for ns, ne in intervals:
-                    if ns > end:
-                        next_start = ns
-                        break
-                # 确定新的扩展起点和终点
-                new_start = max(start - (target_length - 1) // 2, prev_end + 1)
-                new_end = min(start + (target_length - 1) // 2, next_start - 1)
-                # 如果新的扩展终点在起点前面，说明没有足够空间来进行扩展
+                next_start = intervals[i + 1][0] if i + 1 < len(intervals) else float('inf')
+                half = (target_length - 1) // 2
+                new_start = max(start - half, prev_end + 1)
+                new_end = min(start + half, next_start - 1)
                 if new_end < new_start:
-                    new_start, new_end = start, start  # 保持原样
+                    new_start, new_end = start, start
                 expanded.append((new_start, new_end))
             else:
-                # 非单点区间直接保留，稍后处理任何可能的重叠
                 expanded.append((start, end))
-        # 排序以合并那些因扩展导致重叠的区间
-        expanded.sort(key=lambda x: x[0])
-        # 合并重叠的区间，但仅当它们之间真正重叠且小于目标长度时
+        # 一次遍历：合并重叠或相邻的短区间 O(n)
         merged = [expanded[0]]
         for start, end in expanded[1:]:
             last_start, last_end = merged[-1]
-            # 检查是否重叠
-            if start <= last_end and (end - last_start + 1 < target_length or last_end - last_start + 1 < target_length):
-                # 需要合并
-                merged[-1] = (last_start, max(last_end, end))  # 合并区间
-            elif start == last_end + 1 and (end - last_start + 1 < target_length or last_end - last_start + 1 < target_length):
-                # 相邻区间也需要合并的场景
-                merged[-1] = (last_start, end)
+            last_len = last_end - last_start + 1
+            cur_len = end - start + 1
+            if (start <= last_end or start == last_end + 1) and (cur_len < target_length or last_len < target_length):
+                merged[-1] = (last_start, max(last_end, end))
             else:
-                # 如果没有重叠且都大于目标长度，则直接保留
                 merged.append((start, end))
         return merged

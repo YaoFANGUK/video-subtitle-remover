@@ -16,5 +16,5 @@ class SubtitleDetectMode(Enum):
     """
     字幕检测算法枚举
     """
-    PP_OCRv5_MOBILE = "快速"
-    PP_OCRv5_SERVER = "精准"
+    PP_OCRv5_MOBILE = "PP_OCRv5_MOBILE"
+    PP_OCRv5_SERVER = "PP_OCRv5_SERVER"

@@ -43,7 +43,7 @@ class SettingInterface(QtWidgets.QVBoxLayout):
             title=tr["SubtitleExtractorGUI"]["SubtitleDetectMode"],
             content="",
             parent=parent,
-            texts=[mode.value for mode in config.subtitleDetectMode.validator.options],
+            texts=[list(tr['SubtitleDetectMode'].values())[i] for i,_ in enumerate(config.subtitleDetectMode.validator.options)],
         )
         self.addWidget(self.subtitle_detect_model_combo)
 
