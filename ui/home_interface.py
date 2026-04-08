@@ -51,6 +51,7 @@ class HomeInterface(QWidget):
         self._worker_thread = None
         self.running_process = None
         self._saved_inpaint_mode = None  # 保存图片锁定前的 inpaint 模式
+        self._video_cap_lock = threading.Lock()  # 保护 video_cap 的线程锁
 
         # 当前正在处理的任务索引
         self.current_processing_task_index = -1
@@ -164,13 +165,17 @@ class HomeInterface(QWidget):
 
     
     def slider_changed(self, value):
-        if self.video_cap is not None and self.video_cap.isOpened():
-            frame_no = self.video_slider.value()
-            self.video_cap.set(cv2.CAP_PROP_POS_FRAMES, frame_no)
-            ret, frame = self.video_cap.read()
-            if ret:
-                # 更新预览图像
-                self.update_preview(frame)
+        frame = None
+        with self._video_cap_lock:
+            if self.video_cap is not None and self.video_cap.isOpened():
+                frame_no = self.video_slider.value()
+                self.video_cap.set(cv2.CAP_PROP_POS_FRAMES, frame_no)
+                ret, frame = self.video_cap.read()
+                if not ret:
+                    frame = None
+        if frame is not None:
+            # 更新预览图像
+            self.update_preview(frame)
 
     def ab_sections_changed(self, ab_sections):
         get_current_task_index = self.task_list_component.get_current_task_index()
@@ -347,9 +352,10 @@ class HomeInterface(QWidget):
                             # 选中当前任务
                             self.select_task_signal.emit(self.current_processing_task_index)
 
-                            if self.video_cap:
-                                self.video_cap.release()
-                                self.video_cap = None
+                            with self._video_cap_lock:
+                                if self.video_cap:
+                                    self.video_cap.release()
+                                    self.video_cap = None
 
                             self.task_status_signal.emit(self.current_processing_task_index, TaskStatus.PROCESSING)
                             options = {}
@@ -385,9 +391,10 @@ class HomeInterface(QWidget):
                                 self.task_status_signal.emit(self.current_processing_task_index, TaskStatus.FAILED)
                             break
                         finally:
-                            if self.video_cap:
-                                self.video_cap.release()
-                                self.video_cap = None
+                            with self._video_cap_lock:
+                                if self.video_cap:
+                                    self.video_cap.release()
+                                    self.video_cap = None
                             time.sleep(1)
                 finally:
                     self.toggle_buttons_signal.emit(True)
@@ -559,22 +566,27 @@ class HomeInterface(QWidget):
 
     def load_video(self, video_path):
         self.video_path = video_path
-        if self.video_cap:
-            self.video_cap.release()
-            self.video_cap = None
+        with self._video_cap_lock:
+            if self.video_cap:
+                self.video_cap.release()
+                self.video_cap = None
         # 如果是图片文件，直接走图片加载路径
         if is_image_file(video_path):
             return self.load_as_picture(video_path)
-        self.video_cap = cv2.VideoCapture(get_readable_path(self.video_path))
-        if not self.video_cap.isOpened():
-            return self.load_as_picture(video_path)
-        ret, frame = self.video_cap.read()
-        if not ret:
-            return self.load_as_picture(video_path)
-        self.frame_count = int(self.video_cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        self.frame_height = int(self.video_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        self.frame_width = int(self.video_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        self.fps = self.video_cap.get(cv2.CAP_PROP_FPS)
+        with self._video_cap_lock:
+            self.video_cap = cv2.VideoCapture(get_readable_path(self.video_path))
+            if not self.video_cap.isOpened():
+                self.video_cap = None
+                return self.load_as_picture(video_path)
+            ret, frame = self.video_cap.read()
+            if not ret:
+                self.video_cap.release()
+                self.video_cap = None
+                return self.load_as_picture(video_path)
+            self.frame_count = int(self.video_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            self.frame_height = int(self.video_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            self.frame_width = int(self.video_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            self.fps = self.video_cap.get(cv2.CAP_PROP_FPS)
 
         self.update_preview(frame)
         self.video_slider.setMaximum(self.frame_count)
@@ -666,9 +678,10 @@ class HomeInterface(QWidget):
             self.video_display_component.ab_sections_changed.disconnect(self.ab_sections_changed)
             self.video_display_component.selections_changed.disconnect(self.selections_changed)
             # 释放视频资源
-            if self.video_cap:
-                self.video_cap.release()
-                self.video_cap = None
+            with self._video_cap_lock:
+                if self.video_cap:
+                    self.video_cap.release()
+                    self.video_cap = None
         except Exception as e:
             print(f"Error during close window:", e)
         super().closeEvent(event)
