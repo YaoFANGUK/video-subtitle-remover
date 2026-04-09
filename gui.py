@@ -8,6 +8,14 @@
 
 import sys
 import os
+
+# PyInstaller 打包后资源路径处理
+def resource_path(relative_path):
+    """获取资源文件的绝对路径（兼容 PyInstaller 打包）"""
+    if getattr(sys, 'frozen', False):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath(os.path.dirname(__file__)), relative_path)
+
 import configparser
 import cv2
 import multiprocessing
@@ -42,7 +50,7 @@ class SubtitleExtractorGUI(FluentWindow):
         # self.themeListener.start()
  
         # 设置窗口图标
-        self.setWindowIcon(QtGui.QIcon("design/vsr.ico"))
+        self.setWindowIcon(QtGui.QIcon(resource_path("design/vsr.ico")))
         self.setWindowTitle(tr['SubtitleExtractorGUI']['Title'] + " v" + VERSION)
         # 创建界面布局
         self._create_layout()
@@ -162,6 +170,7 @@ class SubtitleExtractorGUI(FluentWindow):
 
 
 if __name__ == '__main__':
+    multiprocessing.freeze_support()
     multiprocessing.set_start_method("spawn")
     QApplication.setHighDpiScaleFactorRoundingPolicy(
     Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)

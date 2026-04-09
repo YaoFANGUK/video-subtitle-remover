@@ -379,6 +379,7 @@ class SubtitleRemover:
 
 
 if __name__ == '__main__':
+    multiprocessing.freeze_support()
     multiprocessing.set_start_method("spawn")
     from backend.tools.args_handler import parse_args
     args = parse_args()

@@ -1,5 +1,6 @@
 
 import os
+import sys
 from pathlib import Path
 from qfluentwidgets import (qconfig, ConfigItem, QConfig, OptionsValidator, BoolValidator, OptionsConfigItem, 
                             EnumSerializer, RangeValidator, RangeConfigItem, ConfigValidator)
@@ -101,7 +102,13 @@ class Config(QConfig):
     # 视频保存目录
     saveDirectory = ConfigItem("Main", "SaveDirectory", "", ConfigValidator())
 
-CONFIG_FILE = 'config/config.json'
+# PyInstaller 打包后配置文件写入 .app bundle 同级目录（避免修改签名）
+if getattr(sys, 'frozen', False):
+    # sys.executable -> Contents/MacOS/VideoSubtitleRemover, 向上3级到 .app 所在目录
+    _app_dir = os.path.dirname(os.path.dirname(os.path.dirname(sys.executable)))
+    CONFIG_FILE = os.path.join(_app_dir, 'config', 'config.json')
+else:
+    CONFIG_FILE = 'config/config.json'
 config = Config()
 qconfig.load(CONFIG_FILE, config)
 
