@@ -74,7 +74,7 @@ options:
                         Output video file path (optional)
   --subtitle-area-coords YMIN YMAX XMIN XMAX, -c YMIN YMAX XMIN XMAX
                         Subtitle area coordinates (ymin ymax xmin xmax). Can be specified multiple times for multiple areas.
-  --inpaint-mode {sttn-auto,sttn-det,lama,propainter,opencv}
+  --inpaint-mode {sttn-auto,sttn-det,lama,opencv}
                         Inpaint mode, default is sttn-auto
 ```
 ## 演示
@@ -235,7 +235,6 @@ STTN_SKIP_DETECTION = True # 跳过字幕检测，跳过后可能会导致要去
 
 > - InpaintMode.STTN 算法：对于真人视频效果较好，速度快，可以跳过字幕检测
 > - InpaintMode.LAMA 算法：对于图片效果最好，对动画类视频效果好，速度一般，不可以跳过字幕检测
-> - InpaintMode.PROPAINTER 算法： 需要消耗大量显存，速度较慢，对运动非常剧烈的视频效果较好
 
 - 使用STTN算法
 
