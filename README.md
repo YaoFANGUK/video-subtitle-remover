@@ -6,6 +6,7 @@
 <div align="center">
 <a href="https://trendshift.io/repositories/9120" target="_blank"><img src="https://trendshift.io/api/badge/repositories/9120" alt="YaoFANGUK%2Fvideo-subtitle-remover | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 </div>
+
 ## 项目简介
 
 ![License](https://img.shields.io/badge/License-Apache%202-red.svg)
