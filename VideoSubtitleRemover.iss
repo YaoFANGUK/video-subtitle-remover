@@ -21,9 +21,7 @@ SolidCompression=yes
 ; 内部文件需要更多内存，禁用
 InternalCompressLevel=none
 SetupIconFile=design\vsr.ico
-WizardImageFile=design\vsr.ico
-WizardSmallImageFile=design\vsr.ico
-WizardImageStretch=no
+; 使用默认向导图片，避免bitmap格式错误
 UninstallDisplayIcon={app}\VideoSubtitleRemover.exe
 VersionInfoVersion=1.4.0
 VersionInfoCompany=YaoFANGUK
