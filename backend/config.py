@@ -1,5 +1,6 @@
 
 import os
+import sys
 from pathlib import Path
 from qfluentwidgets import (qconfig, ConfigItem, QConfig, OptionsValidator, BoolValidator, OptionsConfigItem, 
                             EnumSerializer, RangeValidator, RangeConfigItem, ConfigValidator)
@@ -115,10 +116,16 @@ elif isinstance(_detect_mode_value, str) and _detect_mode_value in ("精准", "P
 # 读取界面语言配置
 tr = configparser.ConfigParser()
 
-TRANSLATION_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'interface', f"{config.interface.value}.ini")
-tr.read(TRANSLATION_FILE, encoding='utf-8')
+# 确定运行环境（开发环境或打包环境）
+if getattr(sys, 'frozen', False):
+    # 打包后的环境
+    BASE_DIR = sys._MEIPASS
+    TRANSLATION_FILE = os.path.join(BASE_DIR, 'backend', 'interface', f"{config.interface.value}.ini")
+else:
+    # 开发环境
+    BASE_DIR = str(Path(os.path.abspath(__file__)).parent.parent)
+    TRANSLATION_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'interface', f"{config.interface.value}.ini")
 
-# 项目的base目录
-BASE_DIR = str(Path(os.path.abspath(__file__)).parent)
+tr.read(TRANSLATION_FILE, encoding='utf-8')
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

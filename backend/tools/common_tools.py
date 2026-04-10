@@ -38,11 +38,15 @@ def is_video_or_image(filename):
     return file_extension in video_extensions or file_extension in image_extensions
 
 def merge_big_file_if_not_exists(dir, file, man_filename = None):
-    if file not in os.listdir(dir):
-        fs = Filesplit()
-        if man_filename is not None:
-            fs.man_filename = man_filename
-        fs.merge(input_dir=dir)
+    try:
+        if file not in os.listdir(dir):
+            fs = Filesplit()
+            if man_filename is not None:
+                fs.man_filename = man_filename
+            fs.merge(input_dir=dir)
+    except Exception as e:
+        print(f"Warning: Could not merge big file {file} in {dir}: {e}")
+        return False
 
 def get_readable_path(path):
     if sys.platform != 'win32':

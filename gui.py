@@ -41,8 +41,14 @@ class SubtitleExtractorGUI(FluentWindow):
         # self.themeListener = SystemThemeListener(self)
         # self.themeListener.start()
  
-        # 设置窗口图标
-        self.setWindowIcon(QtGui.QIcon("design/vsr.ico"))
+        # 设置窗口图标（支持打包环境）
+        if getattr(sys, 'frozen', False):
+            # 打包后的环境
+            icon_path = os.path.join(sys._MEIPASS, 'design', 'vsr.ico')
+        else:
+            # 开发环境
+            icon_path = "design/vsr.ico"
+        self.setWindowIcon(QtGui.QIcon(icon_path))
         self.setWindowTitle(tr['SubtitleExtractorGUI']['Title'] + " v" + VERSION)
         # 创建界面布局
         self._create_layout()
@@ -162,6 +168,8 @@ class SubtitleExtractorGUI(FluentWindow):
 
 
 if __name__ == '__main__':
+    # 支持打包后的多进程
+    multiprocessing.freeze_support()
     multiprocessing.set_start_method("spawn")
     QApplication.setHighDpiScaleFactorRoundingPolicy(
     Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
