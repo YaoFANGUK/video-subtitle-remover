@@ -34,7 +34,7 @@ REM 执行 PyInstaller 打包
 echo [2/5] 开始 PyInstaller 打包...
 echo 这可能需要几分钟时间，请耐心等待...
 echo.
-pyinstaller --clean --noconfirm VideoSubtitleRemover_vsr.spec
+pyinstaller --clean --noconfirm VideoSubtitleRemover.spec
 if errorlevel 1 (
     echo ✗ 打包失败！
     pause
