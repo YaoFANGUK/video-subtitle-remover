@@ -11,9 +11,16 @@ import os
 import configparser
 import cv2
 import multiprocessing
+import ctypes
 from PySide6.QtCore import Qt, QTranslator
 from PySide6 import QtCore, QtWidgets, QtGui
 from PySide6.QtWidgets import QApplication, QFrame, QStackedWidget, QHBoxLayout, QLabel
+
+# 请求管理员权限（Windows）
+if sys.platform == 'win32' and not ctypes.windll.shell32.IsUserAnAdmin():
+    params = ' '.join([f'"{arg}"' for arg in sys.argv])
+    ctypes.windll.shell32.ShellExecuteW(None, 'runas', sys.executable, params, None, 1)
+    sys.exit(0)
 from qfluentwidgets import (FluentWindow, PushButton, Slider, ProgressBar, PlainTextEdit,
                           setTheme, Theme, FluentIcon, CardWidget, SettingCardGroup,
                           ComboBoxSettingCard, SwitchSettingCard, setThemeColor, OptionsConfigItem,

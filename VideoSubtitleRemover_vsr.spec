@@ -21,6 +21,12 @@ datas = [
     (os.path.join(current_dir, 'ui/icon'), 'ui/icon'),
 ]
 
+# 手动添加interface文件，确保被包含
+for filename in os.listdir(os.path.join(current_dir, 'backend/interface')):
+    if filename.endswith('.ini'):
+        src = os.path.join(current_dir, 'backend/interface', filename)
+        datas.append((src, 'backend/interface'))
+
 binaries = []
 
 # 收集重要包的数据文件
@@ -297,8 +303,6 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=['design\\vsr.ico'],
-    # 请求管理员权限
-    uac_admin=True,  # 以管理员身份运行
 )
 
 coll = COLLECT(
