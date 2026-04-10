@@ -2,9 +2,12 @@
 ; 编译方法：下载 Inno Setup Compiler (https://jrsoftware.org/isdl.php)
 ; 或者使用命令：iscc VideoSubtitleRemover.iss
 
+; 定义版本号
+#define MyAppVersion "1.4.0"
+
 [Setup]
 AppName=视频字幕去除器
-AppVersion={#GetVersionNumber}
+AppVersion={#MyAppVersion}
 AppPublisher=YaoFANGUK
 AppPublisherURL=https://github.com/YaoFANGUK/video-subtitle-remover
 AppSupportURL=https://github.com/YaoFANGUK/video-subtitle-remover/issues
@@ -12,7 +15,7 @@ AppComments=基于AI的图片/视频硬字幕去除工具
 DefaultDirName={autopf}\Program Files\视频字幕去除器
 DefaultGroupName=视频字幕去除器
 AllowNoIcons=yes
-OutputBaseFilename=VideoSubtitleRemover-Setup
+OutputBaseFilename=VideoSubtitleRemover-Setup-v{#MyAppVersion}
 Compression=lzma
 SolidCompression=yes
 ; 内部文件需要更多内存，禁用
@@ -27,10 +30,6 @@ VersionInfoCompany=YaoFANGUK
 VersionInfoDescription=视频字幕去除器
 VersionInfoCopyright=© 2026 YaoFANGUK
 VersionInfoProductName=视频字幕去除器
-
-[Languages]
-Name: "chinese"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
-Name: "english"; MessagesFile: "compiler:Languages\English.isl"
 
 [Files]
 Source: "dist\VideoSubtitleRemover\_internal\*"; DestDir: "{app}\_internal"; Flags: ignoreversion recursesubdirs createallsubdirs
