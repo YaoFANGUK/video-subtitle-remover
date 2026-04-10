@@ -1,0 +1,55 @@
+隐藏控制台窗口的方法
+===================
+
+由于某些库（OpenCV、PaddlePaddle等）在初始化时会创建控制台窗口，
+即使在 PyInstaller 中设置 console=False 也无法完全避免。
+
+推荐解决方案：创建无窗口快捷方式
+==============================
+
+方法一：使用 VBScript 启动器（最可靠）
+--------------------------------------
+
+创建文件：隐藏控制台启动.vbs
+
+内容：
+```
+Set WshShell = CreateObject("WScript.Shell")
+WshShell.Run chr(34) & WScript.ScriptFullName & "\..\VideoSubtitleRemover.exe" & chr(34), 0, False
+```
+
+保存到 dist/VideoSubtitleRemover/ 目录，双击此 vbs 文件即可启动。
+
+方法二：修改现有快捷方式
+--------------------------------------
+
+1. 找到 VideoSubtitleRemover.exe，右键点击
+2. 选择"发送到" → "桌面快捷方式"
+3. 在桌面找到创建的快捷方式，右键点击 → "属性"
+4. 找到"目标"字段，在路径前添加：
+   ``wscript.exe "隐藏控制台启动.vbs" /B //Nologo``
+
+   例如：
+   原目标：C:\path\to\VideoSubtitleRemover.exe
+   新目标：wscript.exe "C:\path\to\隐藏控制台启动.vbs" /B //Nologo "C:\path\to\VideoSubtitleRemover.exe"
+
+方法三：直接使用 start 命令
+--------------------------------------
+
+创建文件：启动.bat
+
+内容：
+```
+@echo off
+start /B VideoSubtitleRemover.exe
+```
+
+双击此 bat 文件可以最小化控制台窗口的效果。
+
+技术说明
+========
+
+当前版本使用 console=True 模式打包，确保程序稳定运行。
+控制台窗口虽然会显示，但不影响程序功能。
+
+如需完全隐藏控制台窗口，请使用上述方法之一。
