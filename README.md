@@ -264,6 +264,10 @@ LAMA_SUPER_FAST = False  # 保证效果
 
 解决方案：升级7-zip解压程序到最新版本
 
+4. Mac版本运行报错：Error "bad CPU type in executable"
+
+解决方案：打开控制台输入`softwareupdate --install-rosetta` 安装rosetta
+
 
 ## 赞助
 
