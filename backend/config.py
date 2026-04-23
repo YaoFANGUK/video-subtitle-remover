@@ -1,5 +1,6 @@
 
 import os
+import sys
 from pathlib import Path
 from qfluentwidgets import (qconfig, ConfigItem, QConfig, OptionsValidator, BoolValidator, OptionsConfigItem, 
                             EnumSerializer, RangeValidator, RangeConfigItem, ConfigValidator)
@@ -47,7 +48,6 @@ class Config(QConfig):
     - InpaintMode.STTN_AUTO 智能擦除版
     - InpaintMode.STTN_DET 带字幕检测版, 无智能擦除
     - InpaintMode.LAMA 算法：对于动画类视频效果好，速度一般，不可以跳过字幕检测
-    - InpaintMode.PROPAINTER 算法： 需要消耗大量显存，速度较慢，对运动非常剧烈的视频效果较好
     """
     # 【设置inpaint算法】
     inpaintMode = OptionsConfigItem("Main", "InpaintMode", InpaintMode.STTN_AUTO, OptionsValidator(InpaintMode), EnumSerializer(InpaintMode))
@@ -92,12 +92,6 @@ class Config(QConfig):
     # 设置STTN算法最大同时处理的帧数量
     sttnMaxLoadNum = RangeConfigItem("Sttn", "MaxLoadNum", 50, RangeValidator(1, 300))
     getSttnMaxLoadNum = lambda self: max(self.sttnMaxLoadNum.value, self.sttnNeighborStride.value * self.sttnReferenceLength.value)
-    
-    # 以下参数仅适用PROPAINTER算法时，才生效
-    # 【根据自己的GPU显存大小设置】最大同时处理的图片数量，设置越大处理效果越好，但是要求显存越高
-    # 1280x720p视频设置80需要25G显存，设置50需要19G显存
-    # 720x480p视频设置80需要8G显存，设置50需要7G显存
-    propainterMaxLoadNum = RangeConfigItem("ProPainter", "MaxLoadNum", 70, RangeValidator(1, 300))
 
     # 是否使用硬件加速
     hardwareAcceleration = ConfigItem("Main", "HardwareAcceleration", HARDWARD_ACCELERATION_OPTION, BoolValidator())
@@ -108,7 +102,13 @@ class Config(QConfig):
     # 视频保存目录
     saveDirectory = ConfigItem("Main", "SaveDirectory", "", ConfigValidator())
 
-CONFIG_FILE = 'config/config.json'
+# PyInstaller 打包后配置文件写入 .app bundle 同级目录（避免修改签名）
+if getattr(sys, 'frozen', False):
+    # sys.executable -> Contents/MacOS/VideoSubtitleRemover, 向上3级到 .app 所在目录
+    _app_dir = os.path.dirname(os.path.dirname(os.path.dirname(sys.executable)))
+    CONFIG_FILE = os.path.join(_app_dir, 'config', 'config.json')
+else:
+    CONFIG_FILE = 'config/config.json'
 config = Config()
 qconfig.load(CONFIG_FILE, config)
 

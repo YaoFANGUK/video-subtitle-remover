@@ -56,9 +56,6 @@ class AdvancedSettingInterface(ScrollArea):
         self.sttn_group.addSettingCard(self.sttn_max_load_num)
         self.expandLayout.addWidget(self.sttn_group)
 
-        self.propainter_group.addSettingCard(self.propainter_max_load_num)
-        self.expandLayout.addWidget(self.propainter_group)
-
         self.advanced_group.addSettingCard(self.save_directory)
         self.advanced_group.addSettingCard(self.check_update_on_startup)
         self.expandLayout.addWidget(self.advanced_group)
@@ -77,8 +74,6 @@ class AdvancedSettingInterface(ScrollArea):
         self.subtitle_detection_group = SettingCardGroup(tr["Setting"]["SubtitleDetectionSetting"], self.scrollWidget)
         # STTN设置组
         self.sttn_group = SettingCardGroup(tr["Setting"]["SttnSetting"], self.scrollWidget)
-        # Propainter设置组
-        self.propainter_group = SettingCardGroup(tr["Setting"]["ProPainterSetting"], self.scrollWidget)
         # 高级设置组
         self.advanced_group = SettingCardGroup(tr["Setting"]["AdvancedSetting"], self.scrollWidget)
         # 关于设置组
@@ -162,14 +157,6 @@ class AdvancedSettingInterface(ScrollArea):
             title=tr["Setting"]["SttnMaxLoadNum"],
             content=tr["Setting"]["SttnMaxLoadNumDesc"],
             parent=self.sttn_group
-        )
-
-        self.propainter_max_load_num = RangeSettingCard(
-            configItem=config.propainterMaxLoadNum,
-            icon=FluentIcon.DICTIONARY,
-            title=tr["Setting"]["PropainterMaxLoadNum"],
-            content=tr["Setting"]["PropainterMaxLoadNumDesc"],
-            parent=self.propainter_group
         )
 
         # 视频保存路径

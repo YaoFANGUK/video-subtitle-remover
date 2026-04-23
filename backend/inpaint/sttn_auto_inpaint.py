@@ -242,7 +242,7 @@ class STTNAutoInpaint:
             for i in range(rec_time):
                 start_f = i * effective_clip_gap  # 起始帧位置
                 end_f = min((i + 1) * effective_clip_gap, frame_info['len'])  # 结束帧位置
-                tqdm.write(f'Processing: {start_f + 1} - {end_f} / Total: {frame_info['len']}')
+                tqdm.write(f"Processing: {start_f + 1} - {end_f} / Total: {frame_info['len']}")
                 
                 frames_hr = []  # 高分辨率帧列表
                 frames = {}  # 帧字典，用于存储裁剪后的图像

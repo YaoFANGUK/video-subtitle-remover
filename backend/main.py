@@ -19,7 +19,6 @@ from backend.inpaint.sttn_auto_inpaint import STTNAutoInpaint
 from backend.inpaint.sttn_det_inpaint import STTNDetInpaint
 from backend.inpaint.lama_inpaint import LamaInpaint
 from backend.inpaint.opencv_inpaint import OpenCVInpaint
-from backend.inpaint.propainter_inpaint import PropainterInpaint
 from backend.tools.inpaint_tools import create_mask, batch_generator, expand_frame_ranges
 from backend.tools.model_config import ModelConfig
 from backend.tools.ffmpeg_cli import FFmpegCLI
@@ -67,7 +66,6 @@ class SubtitleRemover:
         except Exception:
             self.video_writer = cv2.VideoWriter(get_readable_path(self.video_temp_file.name), cv2.VideoWriter_fourcc(*'mp4v'), self.fps, self.size)
         self.video_out_path = os.path.abspath(os.path.join(os.path.dirname(self.video_path), f'{self.vd_name}_no_sub.mp4'))
-        self.propainter_inpaint = None
         self.ext = os.path.splitext(vd_path)[-1]
         if self.is_picture:
             pic_dir = os.path.join(os.path.dirname(self.video_path), 'no_sub')
@@ -155,94 +153,6 @@ class SubtitleRemover:
         更新预览
         """
         pass
-
-    def propainter_mode(self, tbar):
-        sub_detector = SubtitleDetect(self.video_path, self.sub_areas)
-        sub_list = sub_detector.find_subtitle_frame_no(sub_remover=self)
-        if len(sub_list) == 0:
-            raise Exception(tr['Main']['NoSubtitleDetected'].format(self.video_path))
-        continuous_frame_no_list = sub_detector.find_continuous_ranges_with_same_mask(sub_list)
-        scene_div_points = sub_detector.get_scene_div_frame_no(self.video_path)
-        continuous_frame_no_list = sub_detector.split_range_by_scene(continuous_frame_no_list,
-                                                                          scene_div_points)
-        del sub_detector
-        gc.collect()        
-        device = self.hardware_accelerator.device if self.hardware_accelerator.has_cuda() else torch.device("cpu")
-        propainter_inpaint = PropainterInpaint(device, self.model_config.PROPAINTER_MODEL_DIR, config.propainterMaxLoadNum.value)
-        self.append_output(tr['Main']['ProcessingStartRemovingSubtitles'])
-        index = 0
-        # 使用帧预读取，I/O 与推理重叠
-        reader = FramePrefetcher(self.video_cap)
-        while True:
-            ret, frame = reader.read()
-            if not ret:
-                break
-            index += 1
-            # 如果当前帧没有水印/文本则直接写
-            if index not in sub_list.keys():
-                self.video_writer.write(frame)
-                # self.append_output(f'write frame: {index}')
-                self.update_progress(tbar, increment=1)
-                self.update_preview_with_comp(frame, frame)
-                continue
-            # 如果有水印，判断该帧是不是开头帧
-            else:
-                # 如果是开头帧，则批推理到尾帧
-                if self.is_current_frame_no_start(index, continuous_frame_no_list):
-                    # self.append_output(f'No 1 Current index: {index}')
-                    start_frame_no = index
-                    # self.append_output(f'find start: {start_frame_no}')
-                    # 找到结束帧
-                    end_frame_no = self.find_frame_no_end(index, continuous_frame_no_list)
-                    # 判断当前帧号是不是字幕起始位置
-                    # 如果获取的结束帧号不为-1则说明
-                    if end_frame_no != -1:
-                        # self.append_output(f'find end: {end_frame_no}')
-                        # ************ 读取该区间所有帧 start ************
-                        temp_frames = list()
-                        # 将头帧加入处理列表
-                        temp_frames.append(frame)
-                        inner_index = 0
-                        # 一直读取到尾帧
-                        while index < end_frame_no:
-                            ret, frame = reader.read()
-                            if not ret:
-                                break
-                            index += 1
-                            temp_frames.append(frame)
-                        # ************ 读取该区间所有帧 end ************
-                        if len(temp_frames) < 1:
-                            # 没有待处理，直接跳过
-                            continue
-                        elif len(temp_frames) == 1:
-                            inner_index += 1
-                            single_mask = create_mask(self.mask_size, sub_list[index])
-                            inpainted_frame = self.lama_inpaint.inpaint(frame, single_mask)
-                            self.video_writer.write(inpainted_frame)
-                            # self.append_output(f'write frame: {start_frame_no + inner_index} with mask {sub_list[start_frame_no]}')
-                            self.update_progress(tbar, increment=1)
-                            continue
-                        else:
-                            # 将读取的视频帧分批处理
-                            # 1. 获取当前批次使用的mask
-                            mask = create_mask(self.mask_size, sub_list[start_frame_no])
-                            for batch in batch_generator(temp_frames, config.propainterMaxLoadNum.value):
-                                # 2. 调用批推理
-                                if len(batch) == 1:
-                                    single_mask = create_mask(self.mask_size, sub_list[start_frame_no])
-                                    inpainted_frame = self.lama_inpaint.inpaint(frame, single_mask)
-                                    self.video_writer.write(inpainted_frame)
-                                    # self.append_output(f'write frame: {start_frame_no + inner_index} with mask {sub_list[start_frame_no]}')
-                                    inner_index += 1
-                                    self.update_progress(tbar, increment=1)
-                                elif len(batch) > 1:
-                                    inpainted_frames = propainter_inpaint(batch, mask)
-                                    for i, inpainted_frame in enumerate(inpainted_frames):
-                                        self.video_writer.write(inpainted_frame)
-                                        # self.append_output(f'write frame: {start_frame_no + inner_index} with mask {sub_list[index]}')
-                                        inner_index += 1
-                                        self.update_preview_with_comp(np.clip(batch[i]+mask[:,:,np.newaxis]*0.3,0,255).astype(np.uint8), inpainted_frame)
-                                self.update_progress(tbar, increment=len(batch))
 
     def sttn_auto_mode(self, tbar):
         """
@@ -372,9 +282,7 @@ class SubtitleRemover:
         else:
             # 精准模式下，获取场景分割的帧号，进一步切割
             self.log_model()
-            if config.inpaintMode.value == InpaintMode.PROPAINTER:
-                self.propainter_mode(tbar)
-            elif config.inpaintMode.value == InpaintMode.STTN_AUTO:
+            if config.inpaintMode.value == InpaintMode.STTN_AUTO:
                 self.sttn_auto_mode(tbar)
             elif config.inpaintMode.value == InpaintMode.STTN_DET:
                 self.video_inpaint(tbar, self.sttn_det_inpaint)
@@ -471,6 +379,7 @@ class SubtitleRemover:
 
 
 if __name__ == '__main__':
+    multiprocessing.freeze_support()
     multiprocessing.set_start_method("spawn")
     from backend.tools.args_handler import parse_args
     args = parse_args()

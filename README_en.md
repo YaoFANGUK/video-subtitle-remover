@@ -76,7 +76,7 @@ options:
                         Output video file path (optional)
   --subtitle-area-coords YMIN YMAX XMIN XMAX, -c YMIN YMAX XMIN XMAX
                         Subtitle area coordinates (ymin ymax xmin xmax). Can be specified multiple times for multiple areas.
-  --inpaint-mode {sttn-auto,sttn-det,lama,propainter,opencv}
+  --inpaint-mode {sttn-auto,sttn-det,lama,opencv}
                         Inpaint mode, default is sttn-auto
 ```
 ## Demonstration
@@ -237,7 +237,6 @@ Modify the values in backend/config.py and try different removal algorithms. Her
 
 > - InpaintMode.STTN algorithm: Good for live-action videos and fast in speed, capable of skipping subtitle detection
 > - InpaintMode.LAMA algorithm: Best for images and effective for animated videos, moderate speed, unable to skip subtitle detection
-> - InpaintMode.PROPAINTER algorithm: Consumes a significant amount of VRAM, slower in speed, works better for videos with very intense movement
 
 - Using the STTN algorithm
 
