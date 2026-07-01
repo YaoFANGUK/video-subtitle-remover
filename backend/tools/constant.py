@@ -8,7 +8,6 @@ class InpaintMode(Enum):
     STTN_AUTO = "sttn-auto"
     STTN_DET = "sttn-det"
     LAMA = "lama"
-    PROPAINTER = "propainter"
     OPENCV = "opencv"
 
 @unique
