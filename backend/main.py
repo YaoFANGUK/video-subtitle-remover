@@ -1,9 +1,13 @@
+import os
+# Must be set before any Qt/PySide6 import (triggered by backend.config).
+# The CLI runs headless — without this, PySide6 crashes on servers without X11.
+os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+
 import gc
 import torch
 import shutil
 import traceback
 import subprocess
-import os
 from pathlib import Path
 import threading
 import cv2

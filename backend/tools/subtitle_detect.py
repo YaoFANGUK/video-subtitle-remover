@@ -46,11 +46,21 @@ class SubtitleDetect:
         hardware_accelerator = HardwareAccelerator.instance()
         onnx_providers = hardware_accelerator.onnx_providers
         model_config = ModelConfig()
+        # HPI (PaddleX high-performance inference plugin) must be explicitly
+        # installed (`pip install paddlex-hpi`) and is version-sensitive to CUDA.
+        # Detection runs on CPU, so HPI provides no speedup here.
+        # We only enable HPI if the plugin is actually importable.
+        try:
+            import paddlex.hpi  # noqa: F401
+            _hpi_available = True
+        except ImportError:
+            _hpi_available = False
+
         return TextDetection(
             model_name=model_config.DET_MODEL_NAME,
             model_dir=model_config.DET_MODEL_DIR,
             device="cpu",
-            enable_hpi=len(onnx_providers) > 0,
+            enable_hpi=_hpi_available and len(onnx_providers) > 0,
         )
 
     def detect_subtitle(self, img):

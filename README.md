@@ -143,7 +143,29 @@ cd <源码所在目录>
 
 > 请确保您的 NVIDIA 显卡驱动支持所选 CUDA 版本。
 
-- 推荐 CUDA 11.8，对应 cuDNN 8.6.0。
+**支持两个 CUDA 版本。** 根据您的环境选择：
+
+| 环境 | CUDA | cuDNN | PaddlePaddle GPU | PyTorch | ONNX Runtime |
+|---|---|---|---|---|---|
+| **现代 GPU / Colab / RunPod**（推荐） | 12.x | 9.x | 3.3.0 | 2.7.0 | 1.22.0 |
+| 旧 GPU（Maxwell, Pascal） | 11.8 | 8.6 | 3.0.0 | 2.7.0 | 1.20.1 |
+
+> **重要：** PaddlePaddle ≤ 3.2 内置 cuDNN 8。如果您的系统使用 cuDNN 9（CUDA 12 默认），**必须**使用 PaddlePaddle ≥ 3.3.0。
+
+---
+
+**方案 A：CUDA 12.x + cuDNN 9（Colab / RunPod / 现代 GPU）**
+
+如果您在 Colab、RunPod 或其他云 GPU 上运行，CUDA 12.x 和 cuDNN 9 通常已预装。无需手动安装 CUDA/cuDNN。
+
+```shell
+pip install paddlepaddle-gpu==3.3.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu124/
+pip install torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu124
+pip install onnxruntime-gpu==1.22.0
+pip install -r requirements.txt
+```
+
+**方案 B：CUDA 11.8 + cuDNN 8.6（旧 GPU）**
 
 - 安装 CUDA：
   - Windows：[CUDA 11.8 下载](https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_522.06_windows.exe)
@@ -159,29 +181,13 @@ cd <源码所在目录>
   - [Linux cuDNN 8.6.0 下载](https://developer.download.nvidia.cn/compute/redist/cudnn/v8.6.0/local_installers/11.8/cudnn-linux-x86_64-8.6.0.163_cuda11-archive.tar.xz)
   - 安装方法请参考 NVIDIA 官方文档。
 
-- 安装 PaddlePaddle GPU 版本（CUDA 11.8）：
-  ```shell
-  pip install paddlepaddle-gpu==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu118/
-  ```
-- 安装 Torch GPU 版本（CUDA 11.8）：
-  ```shell
-  pip install torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu118
-  ```
-
-- 安装其他依赖
-  ```shell
-  pip install -r requirements.txt
-  ```
-
-- Linux系统还需要安装
-
-  ```shell
-  # for cuda 12.x
-  pip install onnxruntime-gpu==1.22.0
-  # for cuda 11.x
-  pip install onnxruntime-gpu==1.20.1 --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-11/pypi/simple/
-  ```
-  > 详情见: [Install ONNX Runtime](https://onnxruntime.ai/docs/install/#install-onnx-runtime-gpu-cuda-12x)
+```shell
+pip install paddlepaddle-gpu==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu118/
+pip install torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu118
+pip install -r requirements.txt
+# Linux 系统还需要：
+pip install onnxruntime-gpu==1.20.1 --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-11/pypi/simple/
+```
 
 ##### (2) DirectML（AMD、Intel等GPU/APU加速卡用户）
 
@@ -268,6 +274,20 @@ LAMA_SUPER_FAST = False  # 保证效果
 4. Mac版本运行报错：Error "bad CPU type in executable"
 
 解决方案：打开控制台输入`softwareupdate --install-rosetta` 安装rosetta
+
+5. 无头服务器上运行报错（Colab / RunPod / 云服务器）
+
+**问题：** 出现 `Could not load Qt platform plugin` 或 `The high-performance inference plugin is not available`。
+
+**解决方案：** 无需特殊配置 — CLI 已自动设置 `QT_QPA_PLATFORM=offscreen` 以支持无头运行，并会在 PaddleX HPI 插件不可用时自动禁用。如果仍有问题：
+
+```shell
+# 验证依赖（CUDA 12 / cuDNN 9 环境）
+pip install paddlepaddle-gpu==3.3.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu124/
+pip install onnxruntime-gpu==1.22.0
+```
+
+> **注意：** PaddlePaddle ≤ 3.2 内置 cuDNN 8。Colab/RunPod 默认使用 cuDNN 9，因此需要 PaddlePaddle ≥ 3.3.0。
 
 
 ## 赞助

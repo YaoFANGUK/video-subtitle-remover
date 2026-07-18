@@ -141,7 +141,29 @@ This project supports four running modes: CUDA (NVIDIA GPU acceleration), CPU (n
 
 > Make sure your NVIDIA GPU driver supports the selected CUDA version.
 
-- Recommended CUDA 11.8, corresponding to cuDNN 8.6.0.
+**Two CUDA versions are supported.** Choose based on your environment:
+
+| Environment | CUDA | cuDNN | PaddlePaddle GPU | PyTorch | ONNX Runtime |
+|---|---|---|---|---|---|
+| **Modern GPUs / Colab / RunPod** (recommended) | 12.x | 9.x | 3.3.0 | 2.7.0 | 1.22.0 |
+| Legacy GPUs (Maxwell, Pascal) | 11.8 | 8.6 | 3.0.0 | 2.7.0 | 1.20.1 |
+
+> **Important:** PaddlePaddle ≤ 3.2 bundles cuDNN 8 internally. If your system has cuDNN 9 (default on CUDA 12), you **must** use PaddlePaddle ≥ 3.3.0.
+
+---
+
+**Option A: CUDA 12.x + cuDNN 9 (Colab / RunPod / modern GPUs)**
+
+If you're on Colab, RunPod, or any cloud GPU, CUDA 12.x with cuDNN 9 is likely pre-installed. No need to install CUDA/cuDNN manually.
+
+```shell
+pip install paddlepaddle-gpu==3.3.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu124/
+pip install torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu124
+pip install onnxruntime-gpu==1.22.0
+pip install -r requirements.txt
+```
+
+**Option B: CUDA 11.8 + cuDNN 8.6 (legacy GPUs)**
 
 - Install CUDA:
   - Windows: [Download CUDA 11.8](https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_522.06_windows.exe)
@@ -157,29 +179,13 @@ This project supports four running modes: CUDA (NVIDIA GPU acceleration), CPU (n
   - [Linux cuDNN 8.6.0 Download](https://developer.download.nvidia.cn/compute/redist/cudnn/v8.6.0/local_installers/11.8/cudnn-linux-x86_64-8.6.0.163_cuda11-archive.tar.xz)
   - Follow the installation guide in the NVIDIA official documentation.
 
-- Install PaddlePaddle GPU version (CUDA 11.8):
-  ```shell
-  pip install paddlepaddle-gpu==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu118/
-  ```
-- Install Torch GPU version (CUDA 11.8):
-  ```shell
-  pip install torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu118
-  ```
-
-- Install other dependencies:
-  ```shell
-  pip install -r requirements.txt
-  ```
-
-- For Linux systems, you also need to install:
-
-  ```shell
-  # for cuda 12.x
-  pip install onnxruntime-gpu==1.22.0
-  # for cuda 11.x
-  pip install onnxruntime-gpu==1.20.1 --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-11/pypi/simple/
-  ```
-  > For more details, see: [Install ONNX Runtime](https://onnxruntime.ai/docs/install/#install-onnx-runtime-gpu-cuda-12x)
+```shell
+pip install paddlepaddle-gpu==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu118/
+pip install torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu118
+pip install -r requirements.txt
+# Linux only:
+pip install onnxruntime-gpu==1.20.1 --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-11/pypi/simple/
+```
 
 ##### (2) DirectML (For AMD, Intel, and other GPU/APU users)
 
@@ -262,6 +268,20 @@ LAMA_SUPER_FAST = False  # Ensure quality
 3. 7z file extraction error
 
 Solution: Upgrade the 7-zip extraction program to the latest version.
+
+4. Errors on headless servers (Colab / RunPod / cloud)
+
+**Problem:** `Could not load Qt platform plugin` or `The high-performance inference plugin is not available`.
+
+**Solution:** No special setup needed — the CLI automatically uses `QT_QPA_PLATFORM=offscreen` for headless operation and disables the PaddleX HPI plugin when unavailable. If you still see errors:
+
+```shell
+# Verify dependencies (CUDA 12 / cuDNN 9 environment)
+pip install paddlepaddle-gpu==3.3.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu124/
+pip install onnxruntime-gpu==1.22.0
+```
+
+> **Note:** PaddlePaddle ≤ 3.2 bundles cuDNN 8 internally. Colab/RunPod ship with cuDNN 9, so PaddlePaddle 3.3.0+ is required.
 
 
 ## Sponsor
