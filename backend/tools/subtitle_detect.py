@@ -1,4 +1,3 @@
-import os
 import sys
 from functools import cached_property
 
@@ -41,34 +40,25 @@ class SubtitleDetect:
 
     @cached_property
     def text_detector(self):
-        # PaddlePaddle 3.3+ defaults to the PIR executor. The PP-OCRv5 model
-        # files were exported with an older PIR version; at load time the
-        # oneDNN instruction path fails to convert
-        # ArrayAttribute<DoubleAttribute> to runtime format.
-        # Force the legacy executor to avoid this crash.
-        os.environ.setdefault('PADDLE_PIR_OPT', '0')
-
         import paddle
-        for _flag in ('FLAGS_enable_pir_with_ptx', 'FLAGS_enable_pir_executor'):
-            try:
-                paddle.set_flags({_flag: False})
-            except (ValueError, TypeError):
-                pass
-
         paddle.disable_signal_handler()
         from paddleocr import TextDetection
+
+        model_config = ModelConfig()
         hardware_accelerator = HardwareAccelerator.instance()
         onnx_providers = hardware_accelerator.onnx_providers
-        model_config = ModelConfig()
-        # HPI (PaddleX high-performance inference plugin) must be explicitly
-        # installed (`pip install paddlex-hpi`) and is version-sensitive to CUDA.
-        # Detection runs on CPU, so HPI provides no speedup here.
-        # We only enable HPI if the plugin is actually importable.
+
+        # When PaddleX HPI (paddlex-hpi) is available, PaddleX runs the
+        # model via ONNX Runtime instead of Paddle Inference, bypassing
+        # the PIR executor bug in PaddlePaddle 3.3+ on CUDA 12.
         try:
             import paddlex.hpi  # noqa: F401
             _hpi_available = True
         except ImportError:
             _hpi_available = False
+            print('[Detect] PaddleX HPI not found.')
+            print('[Detect] For CUDA 12 / cuDNN 9 environments, install it:')
+            print('[Detect]   pip install paddlex-hpi')
 
         return TextDetection(
             model_name=model_config.DET_MODEL_NAME,
