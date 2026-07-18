@@ -283,6 +283,18 @@ pip install onnxruntime-gpu==1.22.0
 
 > **Note:** PaddlePaddle ≤ 3.2 bundles cuDNN 8 internally. Colab/RunPod ship with cuDNN 9, so PaddlePaddle 3.3.0+ is required.
 
+5. `ConvertPirAttribute2RuntimeAttribute not support` error
+
+**Problem:** PaddlePaddle 3.3+ uses the PIR executor by default. The PP-OCRv5 model files were exported with an older PIR format, causing this crash during subtitle detection:
+```
+NotImplementedError: ConvertPirAttribute2RuntimeAttribute not support
+  [pir::ArrayAttribute<pir::DoubleAttribute>]
+```
+
+**Solution:** The CLI automatically sets `PADDLE_PIR_OPT=0` and disables PIR executor flags before loading the detection model. If you still see the error, check that:
+- You are using PaddlePaddle 3.3.0+ (older versions may also have PIR issues)
+- The model files in `backend/models/V5/ch_det/` are not corrupted
+
 
 ## Sponsor
 

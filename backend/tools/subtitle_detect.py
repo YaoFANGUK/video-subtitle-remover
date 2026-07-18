@@ -1,3 +1,4 @@
+import os
 import sys
 from functools import cached_property
 
@@ -40,7 +41,20 @@ class SubtitleDetect:
 
     @cached_property
     def text_detector(self):
+        # PaddlePaddle 3.3+ defaults to the PIR executor. The PP-OCRv5 model
+        # files were exported with an older PIR version; at load time the
+        # oneDNN instruction path fails to convert
+        # ArrayAttribute<DoubleAttribute> to runtime format.
+        # Force the legacy executor to avoid this crash.
+        os.environ.setdefault('PADDLE_PIR_OPT', '0')
+
         import paddle
+        for _flag in ('FLAGS_enable_pir_with_ptx', 'FLAGS_enable_pir_executor'):
+            try:
+                paddle.set_flags({_flag: False})
+            except (ValueError, TypeError):
+                pass
+
         paddle.disable_signal_handler()
         from paddleocr import TextDetection
         hardware_accelerator = HardwareAccelerator.instance()

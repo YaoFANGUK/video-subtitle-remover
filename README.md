@@ -289,6 +289,18 @@ pip install onnxruntime-gpu==1.22.0
 
 > **注意：** PaddlePaddle ≤ 3.2 内置 cuDNN 8。Colab/RunPod 默认使用 cuDNN 9，因此需要 PaddlePaddle ≥ 3.3.0。
 
+5. `ConvertPirAttribute2RuntimeAttribute not support` 错误
+
+**问题：** PaddlePaddle 3.3+ 默认使用 PIR 执行器。PP-OCRv5 模型文件使用旧版 PIR 格式导出，导致字幕检测时出现以下崩溃：
+```
+NotImplementedError: ConvertPirAttribute2RuntimeAttribute not support
+  [pir::ArrayAttribute<pir::DoubleAttribute>]
+```
+
+**解决方案：** CLI 已自动在加载检测模型前设置 `PADDLE_PIR_OPT=0` 并禁用 PIR 执行器标志。如果仍然出现错误，请检查：
+- 使用 PaddlePaddle 3.3.0+（旧版本也可能有 PIR 问题）
+- `backend/models/V5/ch_det/` 中的模型文件未损坏
+
 
 ## 赞助
 
