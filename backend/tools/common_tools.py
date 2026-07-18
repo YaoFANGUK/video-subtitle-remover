@@ -37,11 +37,10 @@ def is_video_or_image(filename):
     # 检查扩展名是否在定义的视频或图片文件后缀集合中
     return file_extension in video_extensions or file_extension in image_extensions
 
-def merge_big_file_if_not_exists(dir, file, man_filename = None):
+def merge_big_file_if_not_exists(dir, file, man_filename='fs_manifest.csv'):
     if file not in os.listdir(dir):
         merge = Merge(inputdir=dir, outputdir=dir, outputfilename=file)
-        if man_filename is not None:
-            merge.manfilename = man_filename
+        merge.manfilename = man_filename
         merge.merge(cleanup=False)
 
 def get_readable_path(path):
