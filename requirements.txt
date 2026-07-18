@@ -1,4 +1,4 @@
-filesplit>=3.0.2
+filesplit>=4.0
 opencv-python>=4.11.0.86
 scikit-image>=0.25.2
 tqdm>=4.67.1
@@ -17,17 +17,12 @@ je-showinfilemanager>=1.1.6a4
 # PyTorch + torchvision: install separately with your CUDA version.
 #   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
 
-# PaddlePaddle GPU: install separately from PaddlePaddle's official channel.
+# PaddlePaddle GPU: install separately from official channel.
 #   CUDA 12.x: pip install paddlepaddle-gpu==3.3.1 -i https://www.paddlepaddle.org.cn/packages/stable/cu124/
 
 # ONNX Runtime GPU: install based on your CUDA version.
 #   CUDA 12.x: pip install onnxruntime-gpu>=1.22.0
 #   CUDA 11.x: pip install onnxruntime-gpu>=1.20.1
 
-# PaddleX HPI (optional, enables GPU-accelerated text detection via ONNX Runtime):
+# PaddleX HPI (optional, GPU text detection via ONNX Runtime):
 #   pip install paddlex-hpi
-
-# Training only
-#matplotlib
-#lpips
-#tensorboardX
