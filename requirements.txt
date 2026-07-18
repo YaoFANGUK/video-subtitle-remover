@@ -25,4 +25,4 @@ je-showinfilemanager>=1.1.6a4
 #   CUDA 11.x: pip install onnxruntime-gpu>=1.20.1
 
 # PaddleX HPI (optional, GPU text detection via ONNX Runtime):
-#   pip install paddlex-hpi
+#   paddlex --install hpi-gpu

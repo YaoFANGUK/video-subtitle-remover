@@ -161,7 +161,7 @@ pip install paddlepaddle-gpu==3.3.1 -i https://www.paddlepaddle.org.cn/packages/
 pip install torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu124
 pip install onnxruntime-gpu==1.22.0
 pip install -r requirements.txt
-pip install paddlex-hpi  # GPU text detection (optional, recommended)
+paddlex --install hpi-gpu  # GPU text detection (recommended)
 ```
 
 **Option B: CUDA 11.8 + cuDNN 8.6 (legacy GPUs)**
