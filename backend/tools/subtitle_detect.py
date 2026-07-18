@@ -45,26 +45,41 @@ class SubtitleDetect:
         from paddleocr import TextDetection
 
         model_config = ModelConfig()
-        hardware_accelerator = HardwareAccelerator.instance()
-        onnx_providers = hardware_accelerator.onnx_providers
+        accelerator = HardwareAccelerator.instance()
+        has_cuda = accelerator.has_cuda()
+        onnx_providers = accelerator.onnx_providers
 
-        # When PaddleX HPI (paddlex-hpi) is available, PaddleX runs the
-        # model via ONNX Runtime instead of Paddle Inference, bypassing
-        # the PIR executor bug in PaddlePaddle 3.3+ on CUDA 12.
+        # HPI (paddlex-hpi) makes PaddleX run the model via ONNX Runtime
+        # instead of Paddle Inference. This bypasses the PIR executor bug
+        # on PaddlePaddle 3.3+ / CUDA 12.
         try:
             import paddlex.hpi  # noqa: F401
             _hpi_available = True
         except ImportError:
             _hpi_available = False
-            print('[Detect] PaddleX HPI not found.')
-            print('[Detect] For CUDA 12 / cuDNN 9 environments, install it:')
-            print('[Detect]   pip install paddlex-hpi')
+
+        if has_cuda and _hpi_available:
+            # GPU + HPI: ONNX Runtime CUDA → fast, no PIR crash.
+            _device = "gpu"
+            _hpi = True
+        elif has_cuda and not _hpi_available:
+            # GPU + no HPI: Paddle Inference CUDA would hit the PIR bug on
+            # PaddlePaddle 3.3+.  Fall back to CPU until HPI is installed.
+            _device = "cpu"
+            _hpi = False
+            print('[Detect] WARNING: CUDA detected but paddlex-hpi not installed.')
+            print('[Detect]   Detection will run on CPU (slow). Install HPI for GPU:')
+            print('[Detect]     pip install paddlex-hpi')
+        else:
+            # No CUDA: use Paddle CPU.
+            _device = "cpu"
+            _hpi = False
 
         return TextDetection(
             model_name=model_config.DET_MODEL_NAME,
             model_dir=model_config.DET_MODEL_DIR,
-            device="cpu",
-            enable_hpi=_hpi_available and len(onnx_providers) > 0,
+            device=_device,
+            enable_hpi=_hpi,
         )
 
     def detect_subtitle(self, img):

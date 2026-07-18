@@ -147,7 +147,7 @@ cd <源码所在目录>
 
 | 环境 | CUDA | cuDNN | PaddlePaddle GPU | PyTorch | ONNX Runtime |
 |---|---|---|---|---|---|
-| **现代 GPU / Colab / RunPod**（推荐） | 12.x | 9.x | 3.3.0 | 2.7.0 | 1.22.0 |
+| **现代 GPU / Colab / RunPod**（推荐） | 12.x | 9.x | 3.3.1 | 2.7.0 | 1.22.0 |
 | 旧 GPU（Maxwell, Pascal） | 11.8 | 8.6 | 3.0.0 | 2.7.0 | 1.20.1 |
 
 > **重要：** PaddlePaddle ≤ 3.2 内置 cuDNN 8。如果您的系统使用 cuDNN 9（CUDA 12 默认），**必须**使用 PaddlePaddle ≥ 3.3.0。
@@ -159,10 +159,11 @@ cd <源码所在目录>
 如果您在 Colab、RunPod 或其他云 GPU 上运行，CUDA 12.x 和 cuDNN 9 通常已预装。无需手动安装 CUDA/cuDNN。
 
 ```shell
-pip install paddlepaddle-gpu==3.3.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu124/
+pip install paddlepaddle-gpu==3.3.1 -i https://www.paddlepaddle.org.cn/packages/stable/cu124/
 pip install torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu124
 pip install onnxruntime-gpu==1.22.0
 pip install -r requirements.txt
+pip install paddlex-hpi  # GPU 文本检测（可选，推荐）
 ```
 
 **方案 B：CUDA 11.8 + cuDNN 8.6（旧 GPU）**
@@ -202,7 +203,7 @@ pip install onnxruntime-gpu==1.20.1 --index-url https://aiinfra.pkgs.visualstudi
 
 - 适用于没有 GPU 或不希望使用 GPU 的情况。
   ```shell
-  pip install paddlepaddle==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
+  pip install paddlepaddle-gpu==3.3.1 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
   pip install torch==2.7.0 torchvision==0.22.0
   pip install -r requirements.txt
   ```

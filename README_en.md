@@ -145,7 +145,7 @@ This project supports four running modes: CUDA (NVIDIA GPU acceleration), CPU (n
 
 | Environment | CUDA | cuDNN | PaddlePaddle GPU | PyTorch | ONNX Runtime |
 |---|---|---|---|---|---|
-| **Modern GPUs / Colab / RunPod** (recommended) | 12.x | 9.x | 3.3.0 | 2.7.0 | 1.22.0 |
+| **Modern GPUs / Colab / RunPod** (recommended) | 12.x | 9.x | 3.3.1 | 2.7.0 | 1.22.0 |
 | Legacy GPUs (Maxwell, Pascal) | 11.8 | 8.6 | 3.0.0 | 2.7.0 | 1.20.1 |
 
 > **Important:** PaddlePaddle ≤ 3.2 bundles cuDNN 8 internally. If your system has cuDNN 9 (default on CUDA 12), you **must** use PaddlePaddle ≥ 3.3.0.
@@ -157,10 +157,11 @@ This project supports four running modes: CUDA (NVIDIA GPU acceleration), CPU (n
 If you're on Colab, RunPod, or any cloud GPU, CUDA 12.x with cuDNN 9 is likely pre-installed. No need to install CUDA/cuDNN manually.
 
 ```shell
-pip install paddlepaddle-gpu==3.3.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu124/
+pip install paddlepaddle-gpu==3.3.1 -i https://www.paddlepaddle.org.cn/packages/stable/cu124/
 pip install torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu124
 pip install onnxruntime-gpu==1.22.0
 pip install -r requirements.txt
+pip install paddlex-hpi  # GPU text detection (optional, recommended)
 ```
 
 **Option B: CUDA 11.8 + cuDNN 8.6 (legacy GPUs)**
@@ -200,7 +201,7 @@ pip install onnxruntime-gpu==1.20.1 --index-url https://aiinfra.pkgs.visualstudi
 
 - Suitable for systems without GPU or those that do not wish to use GPU.
   ```shell
-  pip install paddlepaddle==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
+  pip install paddlepaddle-gpu==3.3.1 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
   pip install torch==2.7.0 torchvision==0.22.0
   pip install -r requirements.txt
   ```
