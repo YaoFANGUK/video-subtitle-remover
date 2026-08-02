@@ -1,12 +1,15 @@
 import os
+import shlex
 import cv2
 import threading
 import multiprocessing
 import time
 import traceback
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout
+import json
+from PySide6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QDialog,
+                               QPlainTextEdit)
 from PySide6.QtCore import Slot, QRect, Signal
-from PySide6 import QtWidgets
+from PySide6 import QtWidgets, QtGui
 from datetime import datetime
 from qfluentwidgets import (PushButton, CardWidget, TextEdit, FluentIcon)
 from ui.setting_interface import SettingInterface
@@ -14,7 +17,7 @@ from ui.component.video_display_component import VideoDisplayComponent
 from ui.component.task_list_component import TaskListComponent, TaskStatus, TaskOptions
 from ui.icon.my_fluent_icon import MyFluentIcon
 from backend.config import config, tr
-from backend.tools.constant import InpaintMode
+from backend.tools.constant import InpaintMode, SubtitleDetectMode
 from backend.tools.subtitle_remover_remote_call import SubtitleRemoverRemoteCall
 from backend.tools.process_manager import ProcessManager
 from backend.tools.common_tools import get_readable_path, is_image_file, read_image
@@ -147,6 +150,11 @@ class HomeInterface(QWidget):
         self.stop_button.clicked.connect(self.stop_button_clicked)
         
         button_layout.addWidget(self.stop_button)
+        
+        self.cli_button = PushButton(tr['SubtitleExtractorGUI']['GenerateCLI'], self)
+        self.cli_button.setIcon(FluentIcon.COMMAND_PROMPT)
+        self.cli_button.clicked.connect(self.generate_cli_command)
+        button_layout.addWidget(self.cli_button)
         
         button_container.setLayout(button_layout)
         right_layout.addWidget(button_container)
@@ -308,6 +316,152 @@ class HomeInterface(QWidget):
         """线程安全地切换按钮可见性"""
         self.run_button.setVisible(show_run)
         self.stop_button.setVisible(not show_run)
+
+    def generate_cli_command(self):
+        """
+        Generate a portable CLI command from the current GUI settings.
+        Copies the command to clipboard and shows a dialog for review.
+        """
+        # --- guard: must have a task list ---
+        task_index = self.task_list_component.get_current_task_index()
+        if task_index < 0:
+            self.append_output(tr['SubtitleExtractorGUI']['CLINoTask'])
+            # still show an empty dialog so the user sees feedback
+            QtWidgets.QMessageBox.information(
+                self, tr['SubtitleExtractorGUI']['GenerateCLI'],
+                tr['SubtitleExtractorGUI']['CLINoTask']
+            )
+            return
+
+        task = self.task_list_component.get_task(task_index)
+        if task is None:
+            return
+
+        # --- guard: must have video frame dimensions ---
+        if self.frame_width is None or self.frame_height is None:
+            self.append_output(tr['SubtitleExtractorGUI']['CLINoVideo'])
+            QtWidgets.QMessageBox.information(
+                self, tr['SubtitleExtractorGUI']['GenerateCLI'],
+                tr['SubtitleExtractorGUI']['CLINoVideo']
+            )
+            return
+
+        # --- collect settings ---
+        video_path = task.path
+        # OptionsConfigItem.value → Enum member; .value again → the enum's string value
+        inpaint_mode = config.inpaintMode.value.value  # e.g. "sttn-auto"
+        detect_mode = config.subtitleDetectMode.value.value  # e.g. "PP_OCRv5_SERVER"
+        hw_accel = config.hardwareAcceleration.value
+
+        # Subtitle area coords: stored as ratios → convert to absolute pixels
+        sub_areas = self.task_list_component.get_task_option(
+            task_index, TaskOptions.SUB_AREAS, []
+        )
+        cli_coords = []
+        for ymin, ymax, xmin, xmax in sub_areas:
+            ymin_px = int(round(ymin * self.frame_height))
+            ymax_px = int(round(ymax * self.frame_height))
+            xmin_px = int(round(xmin * self.frame_width))
+            xmax_px = int(round(xmax * self.frame_width))
+            cli_coords.append((ymin_px, ymax_px, xmin_px, xmax_px))
+
+        # A/B sections (not CLI-serialisable — will note below)
+        ab_sections = self.task_list_component.get_task_option(
+            task_index, TaskOptions.AB_SECTIONS, []
+        )
+
+        # --- build CLI command string ---
+        cmd_parts = [
+            'python', 'backend/main.py',
+            '-i', shlex.quote(video_path),
+            '-o', shlex.quote(task.output_path),
+            '--inpaint-mode', inpaint_mode,
+        ]
+        for ymin, ymax, xmin, xmax in cli_coords:
+            cmd_parts.extend(['-c', str(ymin), str(ymax), str(xmin), str(xmax)])
+        cli_line = ' '.join(cmd_parts)
+
+        # --- build config reference block ---
+        config_lines = [
+            '# ── Config reference ──────────────────────────────',
+            '# Copy these settings into config/config.json on the',
+            '# target machine so the CLI behaves identically.',
+            '# Most of these are NOT available as CLI flags; they',
+            '# must be set via the config file.',
+            '{',
+        ]
+
+        # Main settings
+        config_lines.append(f'  "Main": {{')
+        config_lines.append(f'    "InpaintMode": "{inpaint_mode}",')
+        config_lines.append(f'    "SubtitleDetectMode": "{detect_mode}",')
+        config_lines.append(f'    "HardwareAcceleration": {"true" if hw_accel else "false"},')
+        config_lines.append(f'    "SubtitleYXAxisDifferencePixel": {config.subtitleYXAxisDifferencePixel.value},')
+        config_lines.append(f'    "SubtitleAreaDeviationPixel": {config.subtitleAreaDeviationPixel.value},')
+        config_lines.append(f'    "SubtitleAreaYAxisDifferencePixel": {config.subtitleAreaYAxisDifferencePixel.value},')
+        config_lines.append(f'    "SubtitleAreaPixelToleranceYPixel": {config.subtitleAreaPixelToleranceYPixel.value},')
+        config_lines.append(f'    "SubtitleAreaPixelToleranceXPixel": {config.subtitleAreaPixelToleranceXPixel.value},')
+        config_lines.append(f'    "SubtitleTimelineBackwardFrameCount": {config.subtitleTimelineBackwardFrameCount.value},')
+        config_lines.append(f'    "subtitleTimelineForwardFrameCount": {config.subtitleTimelineForwardFrameCount.value}')
+        config_lines.append(f'  }},')
+
+        # STTN-specific settings (only if inpaint mode uses STTN)
+        if inpaint_mode in (InpaintMode.STTN_AUTO.value, InpaintMode.STTN_DET.value):
+            config_lines.append(f'  "Sttn": {{')
+            config_lines.append(f'    "NeighborStride": {config.sttnNeighborStride.value},')
+            config_lines.append(f'    "ReferenceLength": {config.sttnReferenceLength.value},')
+            config_lines.append(f'    "MaxLoadNum": {config.sttnMaxLoadNum.value}')
+            config_lines.append(f'  }},')
+
+        # ProPainter-specific settings
+        if inpaint_mode == InpaintMode.PROPAINTER.value:
+            config_lines.append(f'  "ProPainter": {{')
+            config_lines.append(f'    "MaxLoadNum": {config.propainterMaxLoadNum.value}')
+            config_lines.append(f'  }},')
+
+        config_lines.append('}')
+
+        # --- notes ---
+        if ab_sections:
+            ranges_str = ', '.join(f'{s.start}-{s.stop}' for s in ab_sections)
+            config_lines.append(
+                f'# NOTE: A/B sections ({ranges_str}) are NOT passed as CLI args.'
+            )
+        if not cli_coords:
+            config_lines.append(
+                '# NOTE: No subtitle areas selected. The CLI will process'
+            )
+            config_lines.append(
+                '#       the full frame (same as GUI default).'
+            )
+
+        config_block = '\n'.join(config_lines)
+
+        # --- assemble full output ---
+        full_output = cli_line + '\n\n' + config_block
+
+        # --- copy to clipboard ---
+        QtGui.QGuiApplication.clipboard().setText(full_output)
+
+        # --- show dialog ---
+        dialog = QDialog(self)
+        dialog.setWindowTitle(tr['SubtitleExtractorGUI']['GenerateCLI'])
+        dialog.setMinimumSize(700, 500)
+        layout = QVBoxLayout(dialog)
+
+        text_edit = QPlainTextEdit(dialog)
+        text_edit.setPlainText(full_output)
+        text_edit.setReadOnly(True)
+        text_edit.setFont(QtGui.QFont('Consolas, Menlo, monospace', 10))
+        text_edit.setLineWrapMode(QPlainTextEdit.NoWrap)
+        layout.addWidget(text_edit)
+
+        copy_btn = PushButton(tr['SubtitleExtractorGUI']['CLICopyDone'], dialog)
+        copy_btn.setIcon(FluentIcon.COPY)
+        copy_btn.clicked.connect(dialog.accept)
+        layout.addWidget(copy_btn)
+
+        dialog.exec()
 
     def run_button_clicked(self):
         if not self.task_list_component.get_pending_tasks():

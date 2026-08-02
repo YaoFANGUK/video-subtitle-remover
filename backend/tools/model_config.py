@@ -22,5 +22,5 @@ class ModelConfig:
             raise ValueError(f"Invalid subtitle detect mode: {config.subtitleDetectMode.value}")
         self.DET_MODEL_NAME = _MODEL_NAME_MAP[config.subtitleDetectMode.value]
 
-        merge_big_file_if_not_exists(self.LAMA_MODEL_DIR, 'bit-lama.pt')
+        merge_big_file_if_not_exists(self.LAMA_MODEL_DIR, 'big-lama.pt')
         merge_big_file_if_not_exists(self.PROPAINTER_MODEL_DIR, 'ProPainter.pth')

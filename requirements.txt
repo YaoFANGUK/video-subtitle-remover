@@ -1,28 +1,28 @@
-filesplit==3.0.2
-opencv-python==4.11.0.86
-scikit-image==0.25.2
-tqdm==4.67.1
-pyside6-fluent-widgets==1.7.7
-numpy==2.2.5
-av==17.0.0
-einops==0.8.1
-paddleocr==3.4.0
+filesplit>=4.0
+opencv-python>=4.11.0.86
+scikit-image>=0.25.2
+tqdm>=4.67.1
+pyside6-fluent-widgets>=1.7.7
+numpy>=2.2.5
+av>=17.0.0
+einops>=0.8.1
+paddleocr>=3.4.0
 matplotlib
 Pillow
 scipy
 requests
 darkdetect
-je-showinfilemanager==1.1.6a4
-# torch and torchvision are installed separately (see Dockerfile for platform-specific versions)
+je-showinfilemanager>=1.1.6a4
 
-# Training only
-#matplotlib
-#lpips
-#tensorboardX
+# PyTorch + torchvision: install separately with your CUDA version.
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
 
-# Hardware acceleration
-#onnxruntime-gpu==1.20.1; sys_platform == 'linux'
+# PaddlePaddle GPU: install separately from official channel.
+#   CUDA 12.x: pip install paddlepaddle-gpu==3.3.1 -i https://www.paddlepaddle.org.cn/packages/stable/cu124/
 
-# do not upgrade, windows 10/11 compatable issues, check hardware_acclerator.py:100
-#onnxruntime-directml==1.20.1; sys_platform == 'win32'
-#onnxruntime==1.22.0; sys_platform == 'darwin'
+# ONNX Runtime GPU: install based on your CUDA version.
+#   CUDA 12.x: pip install onnxruntime-gpu>=1.22.0
+#   CUDA 11.x: pip install onnxruntime-gpu>=1.20.1
+
+# PaddleX HPI (optional, GPU text detection via ONNX Runtime):
+#   paddlex --install hpi-gpu

@@ -43,15 +43,41 @@ class SubtitleDetect:
         import paddle
         paddle.disable_signal_handler()
         from paddleocr import TextDetection
-        hardware_accelerator = HardwareAccelerator.instance()
-        onnx_providers = hardware_accelerator.onnx_providers
+
         model_config = ModelConfig()
-        return TextDetection(
-            model_name=model_config.DET_MODEL_NAME,
-            model_dir=model_config.DET_MODEL_DIR,
-            device="cpu",
-            enable_hpi=len(onnx_providers) > 0,
+        accelerator = HardwareAccelerator.instance()
+        onnx_providers = accelerator.onnx_providers
+
+        # Check CUDA through BOTH torch AND ONNX Runtime providers.
+        _cuda_available = (
+            accelerator.has_cuda()
+            or any('CUDA' in p for p in onnx_providers)
         )
+
+        if _cuda_available:
+            _device = "gpu"
+            _hpi = True
+        else:
+            _device = "cpu"
+            _hpi = False
+
+        try:
+            return TextDetection(
+                model_name=model_config.DET_MODEL_NAME,
+                model_dir=model_config.DET_MODEL_DIR,
+                device=_device,
+                enable_hpi=_hpi,
+            )
+        except Exception:
+            if _cuda_available:
+                print('[Detect] HPI not available. Install it for GPU text detection:')
+                print('[Detect] paddlex --install hpi-gpu')
+            return TextDetection(
+                model_name=model_config.DET_MODEL_NAME,
+                model_dir=model_config.DET_MODEL_DIR,
+                device="cpu",
+                enable_hpi=False,
+            )
 
     def detect_subtitle(self, img):
         temp_list = []

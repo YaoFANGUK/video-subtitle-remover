@@ -4,7 +4,7 @@ import ctypes
 
 import cv2
 import numpy as np
-from fsplit.filesplit import Filesplit
+from filesplit.merge import Merge
 
 video_extensions = {
     '.mp4', '.m4a', '.m4v', '.f4v', '.f4a', '.m4b', '.m4r', '.f4b', '.mov',
@@ -37,12 +37,11 @@ def is_video_or_image(filename):
     # 检查扩展名是否在定义的视频或图片文件后缀集合中
     return file_extension in video_extensions or file_extension in image_extensions
 
-def merge_big_file_if_not_exists(dir, file, man_filename = None):
+def merge_big_file_if_not_exists(dir, file, man_filename='fs_manifest.csv'):
     if file not in os.listdir(dir):
-        fs = Filesplit()
-        if man_filename is not None:
-            fs.man_filename = man_filename
-        fs.merge(input_dir=dir)
+        merge = Merge(inputdir=dir, outputdir=dir, outputfilename=file)
+        merge.manfilename = man_filename
+        merge.merge(cleanup=False)
 
 def get_readable_path(path):
     if sys.platform != 'win32':
