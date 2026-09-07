@@ -32,6 +32,7 @@ import cv2
 import numpy as np
 import torch
 
+from backend.subtitle_templates import SubtitleTemplates
 from backend.subtitle_tracking import (
     associate_sticker_hits,
     group_sticker_boxes as _group_sticker_boxes,
@@ -76,6 +77,7 @@ WHITE_FIXED_TH = 210     # 修复帧"仍白"判据:放宽以抗重编码灰度�
 WHITE_EDGE_TH = 180
 WHITE_EDGE_RADIUS = 3
 WHITE_EDGE_DILATE = 3
+GLYPH_OUTLINE_RADIUS = 2  # 在亮字形外再覆盖窄暗描边，不填充整行背景
 WHITE_RB_MAX = 25        # |R-B| 上限:排除蓝裤腿等彩色亮物
 MIN_BOX_ASPECT = 1.8     # 检出框最小宽高比(w/h):字幕行是水平长条(实测≥2.7),
                          # 近方形框是动物/物体误检(实测狗被检出 1.1:1 的框),
@@ -453,6 +455,8 @@ class Pipeline:
                 edge = cv2.bitwise_and(loose[y1:y2, x1:x2], near_core)
                 edge = cv2.dilate(edge, np.ones((WHITE_EDGE_DILATE, WHITE_EDGE_DILATE), dtype='uint8'))
                 text_mask = cv2.bitwise_or(local_glyph, edge)
+                text_mask = cv2.dilate(text_mask, np.ones(
+                    (2 * GLYPH_OUTLINE_RADIUS + 1, 2 * GLYPH_OUTLINE_RADIUS + 1), dtype='uint8'))
                 mask[y1:y2, x1:x2] = np.maximum(mask[y1:y2, x1:x2], text_mask)
             elif np.count_nonzero(raw[y1:y2, x1:x2]) >= PROP_TEXT_MIN_GLYPH_PIXELS:
                 # 白色大物体被连通域过滤后不能退回整行矩形擦除。
@@ -499,13 +503,26 @@ class Pipeline:
     def _residual_mask(self, fixed_bgr, original_bgr, boxes):
         h, w = fixed_bgr.shape[:2]
         original = cv2.cvtColor(original_bgr, cv2.COLOR_BGR2RGB)
-        fixed = cv2.cvtColor(fixed_bgr, cv2.COLOR_BGR2RGB)
-        core = self.filter_glyph_by_height(self.white_glyph(original, (0, h, 0, w)))
-        original_edges = self.white_glyph(original, (0, h, 0, w), WHITE_EDGE_TH)
-        near_core = cv2.dilate(core, np.ones((7, 7), dtype='uint8'))
-        allowed = cv2.bitwise_and(original_edges, near_core)
-        still_white = self.filter_glyph_by_height(self.white_glyph(fixed, (0, h, 0, w), WHITE_EDGE_TH))
-        residual = cv2.bitwise_and(allowed, still_white)
+        original_gray = cv2.cvtColor(original_bgr, cv2.COLOR_BGR2GRAY)
+        fixed_gray = cv2.cvtColor(fixed_bgr, cv2.COLOR_BGR2GRAY)
+        # 亮度本身不能区分白衣服与白字，也看不到擦除白字后留下的暗描边。
+        # 同极性连通笔画必须大部分与原结构重合，不能只取偶然相交的像素。
+        raw_white = self.white_glyph(original, (0, h, 0, w))
+        allowed = cv2.dilate(raw_white, np.ones((9, 9), dtype='uint8'))
+        kernel = np.ones((15, 15), dtype='uint8')
+        residual = np.zeros((h, w), dtype='uint8')
+        for operation in (cv2.MORPH_TOPHAT, cv2.MORPH_BLACKHAT):
+            before = cv2.morphologyEx(original_gray, operation, kernel)
+            after = cv2.morphologyEx(fixed_gray, operation, kernel)
+            count, labels, stats, _ = cv2.connectedComponentsWithStats(
+                (after >= 12).astype('uint8'), connectivity=8)
+            supported = (before >= 18) & (allowed > 0)
+            overlap = np.bincount(labels[supported], minlength=count)
+            accepted = ((overlap >= stats[:, cv2.CC_STAT_AREA] * 0.65)
+                        & (stats[:, cv2.CC_STAT_AREA] >= 6))
+            accepted[0] = False
+            matched = (accepted[labels] & supported).astype('uint8') * 255
+            residual = cv2.bitwise_or(residual, matched)
         return cv2.bitwise_and(residual, self.boxes_to_mask(boxes, h, w))
 
     def _repair_propainter_segment(self, frames_bgr, masks, boxes, white_glyph_check=True):
@@ -518,12 +535,15 @@ class Pipeline:
         # 模型内部膨胀仅用于推理，输出严格限制在调用方的精确遮罩内。
         first = [np.where(mask[:, :, None] > 0, fixed, original)
                  for fixed, original, mask in zip(raw, frames_bgr, masks)]
-        del raw
         if not white_glyph_check:
             return first, 0
         try:
+            # 先在模型完整输出上核验结构，避免合成裁断背景线条后误判成字形。
             residual = [self._residual_mask(fixed, original, text_boxes)
-                        for fixed, original, text_boxes in zip(first, frames_bgr, boxes)]
+                        for fixed, original, text_boxes in zip(raw, frames_bgr, boxes)]
+            del raw
+            residual = [cv2.bitwise_and(candidate, mask)
+                        for candidate, mask in zip(residual, masks)]
             runs = merge_residual_runs(
                 [i for i, mask in enumerate(residual) if np.count_nonzero(mask) >= RESID_MIN_PX],
                 total=len(first), context=5, max_runs=1)
@@ -531,7 +551,7 @@ class Pipeline:
             for lo, hi in runs:
                 local_masks = [cv2.bitwise_and(
                     cv2.dilate(residual[i], np.ones((5, 5), dtype='uint8')),
-                    self.boxes_to_mask(boxes[i], *residual[i].shape))
+                    cv2.bitwise_and(masks[i], self.boxes_to_mask(boxes[i], *residual[i].shape)))
                     for i in range(lo, hi + 1)]
                 # 二次修复以首轮结果为输入，避免把已擦掉的文字重新传播回来。
                 second = self.inpainter.inpaint([f.copy() for f in first[lo:hi + 1]], local_masks)
@@ -746,6 +766,7 @@ class Pipeline:
         ov.options = {'crf': '18', 'bf': '0'}
         src = av.open(input_path)
         n_fixed = n_repair = n_checked = n = 0
+        n_recovered = n_unresolved = n_check_failed = 0
         roi_mask = self.boxes_to_mask([region], h, w)
         scene_changes = set(detection['scene_change_frames'])
 
@@ -756,6 +777,7 @@ class Pipeline:
                                         # (24G 卡在实际服务器非 PyTorch 显存占用较高时,
                                         #  80 帧窗口仍会 OOM;60 帧输入优先保证稳定运行)
             seg_frames, seg_masks, seg_pts, seg_boxes = [], [], [], []
+            templates = SubtitleTemplates(region, max_age=PROPAINTER_SUB_VIDEO_LENGTH)
 
             def flush_segment(n_out):
                 """处理当前缓冲:送入全部帧(含尾部重叠上下文),只输出前 n_out 帧。
@@ -766,14 +788,35 @@ class Pipeline:
                 所有帧的移动带都成空洞,无真值可抄→白雾)。
                 """
                 nonlocal seg_frames, seg_masks, seg_pts, seg_boxes, n_fixed, n_repair, n_checked
+                nonlocal n_recovered, n_unresolved, n_check_failed
                 if not seg_frames or n_out <= 0:
                     return
-                self._ensure_propainter()
-                comps, repairs = self._repair_propainter_segment(
-                    seg_frames, seg_masks, seg_boxes, white_glyph_check)
+                effective_masks, effective_boxes = templates.refine(
+                    seg_frames, seg_masks, seg_boxes, seg_pts)
+                n_recovered += sum(np.any((new > 0) & (old == 0))
+                                   for new, old in zip(effective_masks[:n_out], seg_masks[:n_out]))
+                if any(mask.any() for mask in effective_masks):
+                    self._ensure_propainter()
+                    comps, repairs = self._repair_propainter_segment(
+                        seg_frames, effective_masks, effective_boxes, white_glyph_check)
+                else:
+                    comps, repairs = seg_frames, 0
                 n_repair += repairs
                 if white_glyph_check:
-                    n_checked += n_out
+                    try:
+                        remaining = sum(np.count_nonzero(self._residual_mask(
+                            comps[j], seg_frames[j], effective_boxes[j])) >= RESID_MIN_PX
+                            for j in range(n_out))
+                    except Exception as exc:
+                        n_check_failed += n_out
+                        print(f'[propainter] 复核未完成 {n_out} 帧，保留修复结果: '
+                              f'{type(exc).__name__}')
+                    else:
+                        n_checked += n_out
+                        n_unresolved += remaining
+                        if remaining:
+                            print(f'[propainter] 帧 {seg_pts[0]}-{seg_pts[n_out - 1]} '
+                                  f'疑似残留 {remaining}，已到本段复修上限或缺少可信遮罩')
                 for j in range(n_out):
                     comp = np.where(roi_mask[:, :, None] > 0, comps[j], seg_frames[j])
                     frame = av.VideoFrame.from_ndarray(
@@ -782,7 +825,7 @@ class Pipeline:
                     frame.time_base = frame_tb
                     for pkt in ov.encode(frame):
                         dst.mux(pkt)
-                n_fixed += n_out
+                n_fixed += sum(bool(mask.any()) for mask in effective_masks[:n_out])
                 seg_frames = seg_frames[n_out:]
                 seg_masks = seg_masks[n_out:]
                 seg_pts = seg_pts[n_out:]
@@ -792,11 +835,12 @@ class Pipeline:
                 n += 1
                 if n - 1 in scene_changes:
                     flush_segment(len(seg_frames))
+                    templates.reset()
                 img = np.asarray(frame.to_image())  # RGB
                 boxes = all_boxes[n - 1] if n - 1 < len(all_boxes) else []
                 stickers = sticker_boxes.get(n - 1, [])
                 mask = self.propainter_boxes_to_mask(boxes, img, region, sticker_boxes=stickers)
-                if mask.any():
+                if boxes or mask.any():
                     # 文字框只遮白色字形,保留字间的楼梯/裤腿等真实像素;
                     # VLM 贴纸和有色字幕仍由精确矩形覆盖。
                     seg_masks.append(mask)
@@ -879,9 +923,13 @@ class Pipeline:
             os.replace(final, output_path)
         else:
             os.replace(tmp_out, output_path)
-        print(f'[done] {n} 帧 | 修复 {n_fixed} | 残留复核 {n_checked} | 补擦 {n_repair} | '
+        print(f'[done] {n} 帧 | 修复 {n_fixed} | 字形补全 {n_recovered} | '
+              f'残留复核 {n_checked} | 补擦 {n_repair} | 疑似残留 {n_unresolved} | '
+              f'复核未完成 {n_check_failed} | '
               f'耗时 {time.time() - t0:.0f}s → {output_path}')
         return {'frames': n, 'inpainted': n_fixed, 'repaired': n_repair,
+                'template_recovered': int(n_recovered), 'unresolved': n_unresolved,
+                'residual_check_failed': n_check_failed,
                 'ocr_calls': detection['ocr_calls'], 'tracks': detection['tracks'],
                 'seconds': time.time() - t0}
 

@@ -120,6 +120,13 @@ def test_no_residual_or_disabled_check_does_not_call_second_pass():
     assert repairs == 0 and len(calls) == 1
 
 
+def test_residual_outside_effective_mask_does_not_run_empty_second_pass():
+    pipe, original, box, mask, calls, first = repair_fixture()
+    _, repairs = pipe._repair_propainter_segment(
+        [original] * 3, [np.zeros_like(mask)] * 3, [[box]] * 3)
+    assert repairs == 0 and len(calls) == 1
+
+
 def test_residual_check_does_not_mask_new_white_background():
     pipe = Pipeline.__new__(Pipeline)
     original = white_text_frame()
