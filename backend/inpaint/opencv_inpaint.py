@@ -6,7 +6,7 @@ class OpenCVInpaint:
         pass
 
     def inpaint(self, frame, mask):
-        return cv2.inpaint(frame, mask, 3, cv2.INTER_LINEAR)
+        return cv2.inpaint(frame, mask, 3, cv2.INPAINT_TELEA)
 
     def __call__(self, frames, mask):
         comp = []
