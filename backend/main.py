@@ -415,11 +415,32 @@ class SubtitleRemover:
         detect_mode_name = list(tr['SubtitleDetectMode'].values())[list(SubtitleDetectMode).index(config.subtitleDetectMode.value)]
         self.append_output(tr['Main']['SubtitleDetectionModel'].format(f"{detect_mode_name}{providers_str}"))
 
+    def has_audio_stream(self):
+        probe_command = [FFmpegCLI.instance().ffmpeg_path,
+                         "-i", get_readable_path(self.video_path),
+                         "-map", "0:a", "-f", "null",
+                         "-loglevel", "error", "-"]
+        use_shell = True if os.name == "nt" else False
+        try:
+            subprocess.check_output(probe_command, stdin=open(os.devnull), shell=use_shell, timeout=600)
+            return True
+        except Exception:
+            return False
+
     def merge_audio_to_video(self):
+        if not self.has_audio_stream():
+            # 源视频没有音轨，无需提取/合并音频，直接使用处理后的视频作为最终输出
+            if os.path.exists(self.video_temp_file.name):
+                try:
+                    shutil.copy2(self.video_temp_file.name, self.video_out_path)
+                    self.is_successful_merged = True
+                except IOError as e:
+                    self.append_output(tr['Main']['CopyFileFailed'].format(self.video_temp_file.name, self.video_out_path, str(e)))
+            return
         # 创建音频临时对象，windows下delete=True会有permission denied的报错
         temp = tempfile.NamedTemporaryFile(suffix='.aac', delete=False)
         audio_extract_command = [FFmpegCLI.instance().ffmpeg_path,
-                                 "-y", "-i", self.video_path,
+                                 "-y", "-i", get_readable_path(self.video_path),
                                  "-acodec", "copy",
                                  "-vn", "-loglevel", "error", temp.name]
         use_shell = True if os.name == "nt" else False
